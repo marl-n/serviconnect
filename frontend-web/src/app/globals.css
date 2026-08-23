@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: #1A56F0;
+  --brand-dark: #0D1B4B;
+  --accent: #FF6B35;
+  --success: #12B76A;
+}
