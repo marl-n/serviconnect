@@ -3,7 +3,9 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, ActivityIndicator, RefreshControl
 } from 'react-native';
+import { FontAwesome } from '@expo/vector-icons';
 import { businessApi, leadsApi } from '../../services/api';
+import LeadDetailScreen from './LeadDetailScreen';
 
 interface Props {
   onViewLead: (leadId: string) => void;
@@ -26,6 +28,7 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>('ALL');
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -62,6 +65,20 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
     return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
+  // Show lead detail screen
+  if (selectedLeadId) {
+    return (
+      <LeadDetailScreen
+        leadId={selectedLeadId}
+        onBack={() => setSelectedLeadId(null)}
+        onQuoteSent={() => {
+          setSelectedLeadId(null);
+          load();
+        }}
+      />
+    );
+  }
+
   if (loading) return (
     <View style={s.center}>
       <ActivityIndicator size="large" color="#1A56F0" />
@@ -87,7 +104,6 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
 
   return (
     <View style={s.container}>
-      {/* Header */}
       <View style={s.header}>
         <View>
           <Text style={s.headerLabel}>Business Dashboard</Text>
@@ -100,7 +116,7 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
             </View>
           )}
           <TouchableOpacity onPress={onLogout} style={s.logoutBtn}>
-            <Text style={s.logoutText}>Logout</Text>
+            <FontAwesome name="sign-out" size={14} color="rgba(255,255,255,0.8)" />
           </TouchableOpacity>
         </View>
       </View>
@@ -109,7 +125,6 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1A56F0" />}>
 
-        {/* Metric cards */}
         <View style={s.metricsGrid}>
           {metrics.map(m => (
             <View key={m.label} style={s.metricCard}>
@@ -119,21 +134,21 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
           ))}
         </View>
 
-        {/* Verification status */}
         {!business.isVerified && (
           <View style={s.verifyBanner}>
-            <Text style={s.verifyTitle}>Get verified</Text>
-            <Text style={s.verifyText}>Verified businesses get 3x more leads. Submit your documents to get your badge.</Text>
+            <FontAwesome name="shield" size={14} color="#1D4ED8" style={{ marginRight: 8 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.verifyTitle}>Get verified</Text>
+              <Text style={s.verifyText}>Verified businesses get 3x more leads.</Text>
+            </View>
           </View>
         )}
 
-        {/* Lead inbox */}
         <View style={s.sectionHeader}>
           <Text style={s.sectionTitle}>Lead Inbox</Text>
           <Text style={s.sectionCount}>{leads.length} total</Text>
         </View>
 
-        {/* Filter chips */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filterRow}>
           {filters.map(f => (
             <TouchableOpacity
@@ -147,15 +162,15 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
           ))}
         </ScrollView>
 
-        {/* Leads list */}
         {filteredLeads.length === 0 ? (
           <View style={s.emptyBox}>
+            <FontAwesome name="inbox" size={32} color="#D1D5DB" style={{ marginBottom: 12 }} />
             <Text style={s.emptyTitle}>
               {activeFilter === 'ALL' ? 'No leads yet' : `No ${activeFilter.toLowerCase()} leads`}
             </Text>
             <Text style={s.emptyText}>
               {activeFilter === 'ALL'
-                ? 'Boost your listing to start receiving quote requests from customers.'
+                ? 'Boost your listing to start receiving quote requests.'
                 : 'Try a different filter.'}
             </Text>
           </View>
@@ -166,12 +181,10 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
               <TouchableOpacity
                 key={lead.id}
                 style={s.leadCard}
-                onPress={() => onViewLead(lead.id)}>
+                onPress={() => setSelectedLeadId(lead.id)}>
                 <View style={s.leadTop}>
                   <View style={s.leadAvatar}>
-                    <Text style={s.leadAvatarText}>
-                      {lead.business?.name?.charAt(0) ?? 'C'}
-                    </Text>
+                    <FontAwesome name="user" size={16} color="#fff" />
                   </View>
                   <View style={s.leadMeta}>
                     <Text style={s.leadName} numberOfLines={1}>
@@ -185,15 +198,17 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
                 </View>
                 <Text style={s.leadMessage} numberOfLines={2}>{lead.message}</Text>
                 {lead.jobAddress && (
-                  <Text style={s.leadAddress} numberOfLines={1}>📍 {lead.jobAddress}</Text>
+                  <View style={s.leadAddressRow}>
+                    <FontAwesome name="map-marker" size={11} color="#9CA3AF" style={{ marginRight: 5 }} />
+                    <Text style={s.leadAddress} numberOfLines={1}>{lead.jobAddress}</Text>
+                  </View>
                 )}
                 {lead.budget && (
-                  <Text style={s.leadBudget}>
-                    Budget: R{(lead.budget / 100).toLocaleString()}
-                  </Text>
+                  <Text style={s.leadBudget}>Budget: R{(lead.budget / 100).toLocaleString()}</Text>
                 )}
                 {lead.quotes?.length > 0 && (
                   <View style={s.quotedRow}>
+                    <FontAwesome name="check-circle" size={11} color="#065F46" style={{ marginRight: 5 }} />
                     <Text style={s.quotedText}>
                       Quote sent: R{(lead.quotes[0].amount / 100).toLocaleString()}
                     </Text>
@@ -218,17 +233,16 @@ const s = StyleSheet.create({
   header: { backgroundColor: '#0D1B4B', paddingHorizontal: 16, paddingTop: 52, paddingBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 2 },
   headerBiz: { color: '#fff', fontSize: 17, fontWeight: '700', maxWidth: 220 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   notifBadge: { backgroundColor: '#FF6B35', borderRadius: 12, minWidth: 22, height: 22, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 6 },
   notifText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  logoutBtn: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-  logoutText: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '600' },
+  logoutBtn: { backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 8, padding: 8 },
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 12, gap: 8 },
   metricCard: { flex: 1, minWidth: '45%', backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: '#E5E7EB', alignItems: 'center' },
   metricValue: { fontSize: 26, fontWeight: '800', color: '#111827', marginBottom: 4 },
   metricLabel: { fontSize: 11, color: '#9CA3AF', fontWeight: '500', textAlign: 'center' },
-  verifyBanner: { marginHorizontal: 14, marginBottom: 12, backgroundColor: '#EFF6FF', borderRadius: 12, padding: 14, borderWidth: 0.5, borderColor: '#BFDBFE' },
-  verifyTitle: { fontSize: 13, fontWeight: '700', color: '#1D4ED8', marginBottom: 4 },
+  verifyBanner: { marginHorizontal: 14, marginBottom: 12, backgroundColor: '#EFF6FF', borderRadius: 12, padding: 14, borderWidth: 0.5, borderColor: '#BFDBFE', flexDirection: 'row', alignItems: 'flex-start' },
+  verifyTitle: { fontSize: 13, fontWeight: '700', color: '#1D4ED8', marginBottom: 2 },
   verifyText: { fontSize: 12, color: '#1D4ED8', lineHeight: 18 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
@@ -244,15 +258,15 @@ const s = StyleSheet.create({
   leadCard: { marginHorizontal: 14, marginBottom: 10, backgroundColor: '#fff', borderRadius: 14, padding: 14, borderWidth: 0.5, borderColor: '#E5E7EB' },
   leadTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   leadAvatar: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#1A56F0', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  leadAvatarText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   leadMeta: { flex: 1 },
   leadName: { fontSize: 13, fontWeight: '700', color: '#111827' },
   leadDate: { fontSize: 11, color: '#9CA3AF', marginTop: 1 },
   statusBadge: { borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4, flexShrink: 0 },
   statusText: { fontSize: 10, fontWeight: '700' },
   leadMessage: { fontSize: 13, color: '#374151', lineHeight: 20, marginBottom: 6 },
-  leadAddress: { fontSize: 11, color: '#6B7280', marginBottom: 4 },
+  leadAddressRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  leadAddress: { fontSize: 11, color: '#6B7280', flex: 1 },
   leadBudget: { fontSize: 11, fontWeight: '600', color: '#1A56F0', marginBottom: 4 },
-  quotedRow: { backgroundColor: '#ECFDF5', borderRadius: 8, padding: 8, marginTop: 4 },
+  quotedRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', borderRadius: 8, padding: 8, marginTop: 4 },
   quotedText: { fontSize: 11, fontWeight: '600', color: '#065F46' },
 });
