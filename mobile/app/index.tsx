@@ -47,9 +47,9 @@ export default function Index() {
 
   if (user.role === 'BUSINESS') return (
     <DashboardScreen
-      onViewLead={(id) => console.log('view lead', id)}
-      onLogout={logout}
-    />
+  onViewLead={(id) => {}}
+  onLogout={logout}
+/>
   );
 
   const tabs: { key: Tab; label: string; icon: string }[] = [

@@ -39,10 +39,13 @@ export const businessApi = {
 export const leadsApi = {
   createLead: (data: any) => api.post('/leads', data),
   getMyLeads: () => api.get('/leads/my'),
+  getLeadById: (id: string) => api.get(`/leads/${id}`),
   getBusinessLeads: (bizId: string, status?: string) =>
     api.get(`/leads/business/${bizId}`, { params: { status } }),
   sendQuote: (leadId: string, data: any) => api.post(`/leads/${leadId}/quote`, data),
   acceptQuote: (quoteId: string) => api.post(`/leads/quotes/${quoteId}/accept`),
+  updateStatus: (leadId: string, status: string) =>
+    api.patch(`/leads/${leadId}/status`, { status }),
 };
 
 export const reviewsApi = {
