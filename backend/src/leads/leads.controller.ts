@@ -13,7 +13,15 @@ export class LeadsController {
 
   @Post()
   @ApiOperation({ summary: 'Customer sends a quote request to a business' })
-  createLead(@CurrentUser() user: any, @Body() dto: any) { return this.leads.createLead(user.sub, dto); }
+  createLead(@CurrentUser() user: any, @Body() dto: any) {
+    return this.leads.createLead(user.sub, dto);
+  }
+
+  @Get('my')
+  @ApiOperation({ summary: 'Customer sees their sent quote requests' })
+  getMyLeads(@CurrentUser() user: any) {
+    return this.leads.getCustomerLeads(user.sub);
+  }
 
   @Get('business/:businessId')
   @ApiOperation({ summary: 'Business gets their lead inbox' })
@@ -21,9 +29,11 @@ export class LeadsController {
     return this.leads.getBusinessLeads(id, status);
   }
 
-  @Get('my')
-  @ApiOperation({ summary: 'Customer sees their sent quote requests' })
-  getMyLeads(@CurrentUser() user: any) { return this.leads.getCustomerLeads(user.sub); }
+  @Get(':id')
+  @ApiOperation({ summary: 'Get a single lead by ID' })
+  getLead(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.leads.getLeadById(id, user.sub);
+  }
 
   @Patch(':id/status')
   @ApiOperation({ summary: 'Update lead status' })
