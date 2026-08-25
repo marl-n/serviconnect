@@ -106,29 +106,27 @@ export class LeadsService {
     });
   }
 
- async getLeadById(leadId: string, userId: string) {
-  const lead = await this.prisma.lead.findUnique({
-    where: { id: leadId },
-    include: {
-      quotes: { orderBy: { createdAt: 'desc' } },
-      business: {
-        select: {
-          id: true,
-          name: true,
-          userId: true,
-          phone: true,
+  async getLeadById(leadId: string, userId: string) {
+    const lead = await this.prisma.lead.findUnique({
+      where: { id: leadId },
+      include: {
+        quotes: { orderBy: { createdAt: 'desc' } },
+        business: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
         },
       },
-    },
-  });
-  if (!lead) throw new NotFoundException();
+    });
+    if (!lead) throw new NotFoundException();
 
-  // Fetch customer phone separately
-  const customer = await this.prisma.user.findUnique({
-    where: { id: lead.customerId },
-    select: { id: true, name: true, phone: true },
-  });
+    const customer = await this.prisma.user.findUnique({
+      where: { id: lead.customerId },
+      select: { id: true, name: true, phone: true },
+    });
 
-  return { ...lead, customer };
-}
+    return { ...lead, customer };
+  }
 }
