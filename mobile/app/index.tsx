@@ -8,8 +8,9 @@ import SearchScreen from '../src/screens/customer/SearchScreen';
 import ProfileScreen from '../src/screens/customer/ProfileScreen';
 import DashboardScreen from '../src/screens/business/DashboardScreen';
 import OnboardingScreen from '../src/screens/business/OnboardingScreen';
+import MyQuotesScreen from '../src/screens/customer/MyQuotesScreen';
 
-type Tab = 'search' | 'profile';
+type Tab = 'search' | 'profile' | 'quotes';
 
 interface AppState {
   user: any;
@@ -93,6 +94,7 @@ export default function Index() {
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: 'search', label: 'Search', icon: 'search' },
     { key: 'profile', label: 'Account', icon: 'user' },
+    { key: 'quotes', label: 'My Quotes', icon: 'file-text-o' },
   ];
 
   return (
@@ -100,6 +102,7 @@ export default function Index() {
       <View style={s.content}>
         {activeTab === 'search' && <SearchScreen />}
         {activeTab === 'profile' && <ProfileScreen user={user} onLogout={logout} />}
+        {activeTab === 'quotes' && <MyQuotesScreen onViewBusiness={(slug) => {}} />}
       </View>
 
       <View style={s.tabBar}>
