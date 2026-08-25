@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const TOKEN_KEY = 'sc_token';
 
 export const api = axios.create({
- baseURL: 'http://192.168.0.127:3000/api/v1',
+ baseURL: 'http://192.168.0.126:3000/api/v1',
   headers: { 'Content-Type': 'application/json' },
   timeout: 10000,
 });
