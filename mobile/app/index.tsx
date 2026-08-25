@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesome } from '@expo/vector-icons';
 import { authApi, businessApi } from '../src/services/api';
@@ -8,13 +8,16 @@ import SearchScreen from '../src/screens/customer/SearchScreen';
 import ProfileScreen from '../src/screens/customer/ProfileScreen';
 import DashboardScreen from '../src/screens/business/DashboardScreen';
 import OnboardingScreen from '../src/screens/business/OnboardingScreen';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 
 type Tab = 'search' | 'profile';
 
+interface AppState {
+  user: any;
+  business: any;
+}
+
 export default function Index() {
-  const [user, setUser] = useState<any>(null);
-  const [business, setBusiness] = useState<any>(null);
+  const [appState, setAppState] = useState<AppState | null>(null);
   const [checking, setChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('search');
 
@@ -23,11 +26,19 @@ export default function Index() {
       if (token) {
         try {
           const res = await authApi.getMe();
-          setUser(res.data);
-          if (res.data.role === 'BUSINESS') {
-            const bizRes = await businessApi.getMyBusiness();
-            setBusiness(bizRes.data);
+          const user = res.data;
+
+          let business = null;
+          if (user.role === 'BUSINESS') {
+            try {
+              const bizRes = await businessApi.getMyBusiness();
+              business = bizRes.data ?? null;
+            } catch {
+              business = null;
+            }
           }
+
+          setAppState({ user, business });
         } catch {
           await AsyncStorage.removeItem('sc_token');
         }
@@ -38,8 +49,7 @@ export default function Index() {
 
   const logout = async () => {
     await AsyncStorage.removeItem('sc_token');
-    setUser(null);
-    setBusiness(null);
+    setAppState(null);
     setActiveTab('search');
   };
 
@@ -49,13 +59,26 @@ export default function Index() {
     </View>
   );
 
-  if (!user) return (
-    <LoginScreen onLoginSuccess={(u) => setUser(u)} />
+  if (!appState) return (
+    <LoginScreen onLoginSuccess={async (user) => {
+      let business = null;
+      if (user.role === 'BUSINESS') {
+        try {
+          const bizRes = await businessApi.getMyBusiness();
+          business = bizRes.data ?? null;
+        } catch {
+          business = null;
+        }
+      }
+      setAppState({ user, business });
+    }} />
   );
+
+  const { user, business } = appState;
 
   // Business user with no profile — show onboarding
   if (user.role === 'BUSINESS' && !business) return (
-    <OnboardingScreen onComplete={(biz) => setBusiness(biz)} />
+    <OnboardingScreen onComplete={(biz) => setAppState({ user, business: biz })} />
   );
 
   // Business user with profile — show dashboard
@@ -66,7 +89,7 @@ export default function Index() {
     />
   );
 
-  // Customer — show tab layout
+  // Customer tab layout
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: 'search', label: 'Search', icon: 'search' },
     { key: 'profile', label: 'Account', icon: 'user' },

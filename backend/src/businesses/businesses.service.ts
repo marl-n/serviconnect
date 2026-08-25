@@ -39,12 +39,12 @@ async create(userId: string, dto: any) {
     return this.prisma.business.update({ where: { id: businessId }, data: dto });
   }
 
-  async getMyBusiness(userId: string) {
-    return this.prisma.business.findUnique({
-      where: { userId },
-      include: { services: true, subscription: true, ads: { where: { status: 'ACTIVE' } } },
-    });
-  }
+ async getMyBusiness(userId: string) {
+  return this.prisma.business.findUnique({
+    where: { userId },
+    include: { services: true, subscription: true, ads: { where: { status: 'ACTIVE' } } },
+  });
+}
 
   async getDashboardStats(businessId: string) {
     const [leadCount, viewCount, reviewStats, recentLeads] = await Promise.all([
