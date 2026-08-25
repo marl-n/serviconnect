@@ -1,17 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesome } from '@expo/vector-icons';
-import { authApi } from '../src/services/api';
+import { authApi, businessApi } from '../src/services/api';
 import LoginScreen from '../src/screens/auth/LoginScreen';
 import SearchScreen from '../src/screens/customer/SearchScreen';
 import ProfileScreen from '../src/screens/customer/ProfileScreen';
 import DashboardScreen from '../src/screens/business/DashboardScreen';
+import OnboardingScreen from '../src/screens/business/OnboardingScreen';
+import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 
 type Tab = 'search' | 'profile';
 
 export default function Index() {
   const [user, setUser] = useState<any>(null);
+  const [business, setBusiness] = useState<any>(null);
   const [checking, setChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('search');
 
@@ -21,6 +24,10 @@ export default function Index() {
         try {
           const res = await authApi.getMe();
           setUser(res.data);
+          if (res.data.role === 'BUSINESS') {
+            const bizRes = await businessApi.getMyBusiness();
+            setBusiness(bizRes.data);
+          }
         } catch {
           await AsyncStorage.removeItem('sc_token');
         }
@@ -32,6 +39,7 @@ export default function Index() {
   const logout = async () => {
     await AsyncStorage.removeItem('sc_token');
     setUser(null);
+    setBusiness(null);
     setActiveTab('search');
   };
 
@@ -45,13 +53,20 @@ export default function Index() {
     <LoginScreen onLoginSuccess={(u) => setUser(u)} />
   );
 
-  if (user.role === 'BUSINESS') return (
-    <DashboardScreen
-  onViewLead={(id) => {}}
-  onLogout={logout}
-/>
+  // Business user with no profile — show onboarding
+  if (user.role === 'BUSINESS' && !business) return (
+    <OnboardingScreen onComplete={(biz) => setBusiness(biz)} />
   );
 
+  // Business user with profile — show dashboard
+  if (user.role === 'BUSINESS' && business) return (
+    <DashboardScreen
+      onViewLead={(id) => {}}
+      onLogout={logout}
+    />
+  );
+
+  // Customer — show tab layout
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: 'search', label: 'Search', icon: 'search' },
     { key: 'profile', label: 'Account', icon: 'user' },
