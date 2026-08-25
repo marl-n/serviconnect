@@ -21,12 +21,16 @@ export class BusinessesService {
     return biz;
   }
 
-  async create(userId: string, dto: any) {
-    const slug = this.toSlug(dto.name) + '-' + Date.now().toString(36);
-    return this.prisma.business.create({
-      data: { userId, slug, ...dto },
-    });
-  }
+async create(userId: string, dto: any) {
+  // Check if user already has a business
+  const existing = await this.prisma.business.findUnique({ where: { userId } });
+  if (existing) return existing;
+
+  const slug = this.toSlug(dto.name) + '-' + Date.now().toString(36);
+  return this.prisma.business.create({
+    data: { userId, slug, ...dto },
+  });
+}
 
   async update(businessId: string, userId: string, dto: any) {
     const biz = await this.prisma.business.findUnique({ where: { id: businessId } });
