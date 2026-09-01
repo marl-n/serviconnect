@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, ActivityIndicator, RefreshControl
+  StyleSheet, ActivityIndicator, RefreshControl, Alert, Linking
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import { leadsApi } from '../../services/api';
+import BusinessProfileScreen from './BusinessProfileScreen';
 
 interface Props {
-  onViewBusiness: (slug: string) => void;
+  onViewBusiness?: (slug: string) => void;
 }
 
 const statusColors: Record<string, { bg: string; text: string }> = {
@@ -20,12 +21,12 @@ const statusColors: Record<string, { bg: string; text: string }> = {
 };
 
 const statusDescriptions: Record<string, string> = {
-  NEW: 'Waiting for business to respond',
-  VIEWED: 'Business has seen your request',
-  QUOTED: 'Business sent you a quote — review it',
-  ACCEPTED: 'You accepted the quote',
+  NEW:       'Waiting for business to respond',
+  VIEWED:    'Business has seen your request',
+  QUOTED:    'Business sent you a quote — review it',
+  ACCEPTED:  'You accepted the quote',
   COMPLETED: 'Job completed',
-  REJECTED: 'Business could not take this job',
+  REJECTED:  'Business could not take this job',
 };
 
 export default function MyQuotesScreen({ onViewBusiness }: Props) {
@@ -33,6 +34,8 @@ export default function MyQuotesScreen({ onViewBusiness }: Props) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState('ALL');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [viewingSlug, setViewingSlug] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -51,7 +54,6 @@ export default function MyQuotesScreen({ onViewBusiness }: Props) {
   const onRefresh = () => { setRefreshing(true); load(); };
 
   const filters = ['ALL', 'NEW', 'VIEWED', 'QUOTED', 'ACCEPTED', 'COMPLETED'];
-
   const filteredLeads = activeFilter === 'ALL'
     ? leads
     : leads.filter(l => l.status === activeFilter);
@@ -59,8 +61,17 @@ export default function MyQuotesScreen({ onViewBusiness }: Props) {
   const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('en-ZA', {
     day: 'numeric', month: 'short', year: 'numeric'
   });
-
   const formatPrice = (cents: number) => `R${(cents / 100).toLocaleString()}`;
+
+  if (viewingSlug) {
+    return (
+      <BusinessProfileScreen
+        slug={viewingSlug}
+        onBack={() => setViewingSlug(null)}
+        onRequestQuote={() => setViewingSlug(null)}
+      />
+    );
+  }
 
   if (loading) return (
     <View style={s.center}>
@@ -104,10 +115,16 @@ export default function MyQuotesScreen({ onViewBusiness }: Props) {
             const color = statusColors[lead.status] ?? { bg: '#F3F4F6', text: '#374151' };
             const hasQuote = lead.quotes?.length > 0;
             const latestQuote = lead.quotes?.[0];
+            const isExpanded = expandedId === lead.id;
 
             return (
-              <View key={lead.id} style={s.card}>
-                {/* Business info */}
+              <TouchableOpacity
+                key={lead.id}
+                style={[s.card, isExpanded && s.cardExpanded]}
+                onPress={() => setExpandedId(isExpanded ? null : lead.id)}
+                activeOpacity={0.9}>
+
+                {/* Card header — always visible */}
                 <View style={s.cardTop}>
                   <View style={s.bizAvatar}>
                     <Text style={s.bizAvatarText}>
@@ -120,70 +137,135 @@ export default function MyQuotesScreen({ onViewBusiness }: Props) {
                     </Text>
                     <Text style={s.dateText}>{formatDate(lead.createdAt)}</Text>
                   </View>
-                  <View style={[s.statusBadge, { backgroundColor: color.bg }]}>
-                    <Text style={[s.statusText, { color: color.text }]}>{lead.status}</Text>
+                  <View style={s.cardRight}>
+                    <View style={[s.statusBadge, { backgroundColor: color.bg }]}>
+                      <Text style={[s.statusText, { color: color.text }]}>{lead.status}</Text>
+                    </View>
+                    <FontAwesome
+                      name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                      size={11}
+                      color="#9CA3AF"
+                      style={{ marginTop: 6 }}
+                    />
                   </View>
                 </View>
 
-                {/* Status description */}
-                <View style={s.statusDesc}>
+                {/* Status description — always visible */}
+                <View style={s.statusDescRow}>
                   <FontAwesome
                     name={lead.status === 'QUOTED' ? 'exclamation-circle' : 'info-circle'}
                     size={12}
                     color={lead.status === 'QUOTED' ? '#6D28D9' : '#9CA3AF'}
                     style={{ marginRight: 6 }}
                   />
-                  <Text style={[s.statusDescText, lead.status === 'QUOTED' && { color: '#6D28D9', fontWeight: '600' }]}>
+                  <Text style={[s.statusDescText, lead.status === 'QUOTED' && s.statusDescHighlight]}>
                     {statusDescriptions[lead.status]}
                   </Text>
                 </View>
 
-                {/* Job message */}
-                <Text style={s.message} numberOfLines={2}>{lead.message}</Text>
-
-                {/* Quote received */}
-                {hasQuote && (
-                  <View style={s.quoteBox}>
-                    <View style={s.quoteTop}>
-                      <Text style={s.quoteLabel}>Quote received</Text>
-                      <Text style={s.quoteAmount}>{formatPrice(latestQuote.amount)}</Text>
+                {/* Expanded content */}
+                {isExpanded && (
+                  <View style={s.expanded}>
+                    {/* Job request */}
+                    <View style={s.section}>
+                      <Text style={s.sectionTitle}>Your request</Text>
+                      <Text style={s.messageText}>{lead.message}</Text>
+                      {lead.jobAddress && (
+                        <View style={s.infoRow}>
+                          <FontAwesome name="map-marker" size={12} color="#9CA3AF" style={{ marginRight: 6 }} />
+                          <Text style={s.infoText}>{lead.jobAddress}</Text>
+                        </View>
+                      )}
+                      {lead.budget && (
+                        <View style={s.infoRow}>
+                          <FontAwesome name="money" size={12} color="#9CA3AF" style={{ marginRight: 6 }} />
+                          <Text style={s.infoText}>Your budget: {formatPrice(lead.budget)}</Text>
+                        </View>
+                      )}
                     </View>
-                    <Text style={s.quoteDesc} numberOfLines={2}>{latestQuote.description}</Text>
-                    <Text style={s.quoteExpiry}>
-                      Valid until {new Date(latestQuote.validUntil).toLocaleDateString('en-ZA')}
-                    </Text>
 
-                    {latestQuote.status === 'PENDING' && (
-                      <TouchableOpacity
-                        style={s.acceptBtn}
-                        onPress={async () => {
-                          await leadsApi.acceptQuote(latestQuote.id);
-                          load();
-                        }}>
-                        <FontAwesome name="check" size={13} color="#fff" style={{ marginRight: 6 }} />
-                        <Text style={s.acceptBtnText}>Accept Quote</Text>
-                      </TouchableOpacity>
+                    {/* Quote details */}
+                    {hasQuote && (
+                      <View style={s.quoteBox}>
+                        <View style={s.quoteTop}>
+                          <Text style={s.quoteLabel}>Quote from business</Text>
+                          <Text style={s.quoteAmount}>{formatPrice(latestQuote.amount)}</Text>
+                        </View>
+                        <Text style={s.quoteDesc}>{latestQuote.description}</Text>
+                        <Text style={s.quoteExpiry}>
+                          Valid until {new Date(latestQuote.validUntil).toLocaleDateString('en-ZA')}
+                        </Text>
+
+                        {latestQuote.status === 'PENDING' && (
+                          <View style={s.quoteActions}>
+                            <TouchableOpacity
+                              style={s.acceptBtn}
+                              onPress={async () => {
+                                await leadsApi.acceptQuote(latestQuote.id);
+                                load();
+                              }}>
+                              <FontAwesome name="check" size={13} color="#fff" style={{ marginRight: 6 }} />
+                              <Text style={s.acceptBtnText}>Accept</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={s.declineBtn}
+                              onPress={() => {
+                                Alert.alert('Decline Quote', 'Are you sure?', [
+                                  { text: 'Cancel', style: 'cancel' },
+                                  {
+                                    text: 'Decline', style: 'destructive',
+                                    onPress: async () => { await leadsApi.updateStatus(lead.id, 'REJECTED'); load(); }
+                                  }
+                                ]);
+                              }}>
+                              <FontAwesome name="times" size={13} color="#DC2626" style={{ marginRight: 6 }} />
+                              <Text style={s.declineBtnText}>Decline</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={s.whatsappBtn}
+                              onPress={() => {
+                                const number = lead.business?.phone?.replace(/\D/g, '');
+                                if (number) Linking.openURL(
+                                  `https://wa.me/${number}?text=Hi, regarding your quote of ${formatPrice(latestQuote.amount)} for: "${lead.message.slice(0, 60)}"`
+                                );
+                              }}>
+                              <FontAwesome name="whatsapp" size={13} color="#fff" style={{ marginRight: 6 }} />
+                              <Text style={s.whatsappBtnText}>Discuss</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+
+                        {latestQuote.status === 'ACCEPTED' && (
+                          <View style={s.acceptedRow}>
+                            <FontAwesome name="check-circle" size={14} color="#065F46" style={{ marginRight: 6 }} />
+                            <Text style={s.acceptedText}>Quote accepted</Text>
+                          </View>
+                        )}
+
+                        {latestQuote.status === 'REJECTED' && (
+                          <View style={s.declinedRow}>
+                            <FontAwesome name="times-circle" size={14} color="#991B1B" style={{ marginRight: 6 }} />
+                            <Text style={s.declinedText}>Quote declined</Text>
+                          </View>
+                        )}
+                      </View>
                     )}
 
-                    {latestQuote.status === 'ACCEPTED' && (
-                      <View style={s.acceptedRow}>
-                        <FontAwesome name="check-circle" size={14} color="#065F46" style={{ marginRight: 6 }} />
-                        <Text style={s.acceptedText}>Quote accepted</Text>
-                      </View>
+                    {/* View business profile */}
+                    {lead.business?.slug && (
+                      <TouchableOpacity
+                        style={s.viewBizBtn}
+                        onPress={() => setViewingSlug(lead.business.slug)}>
+                        <FontAwesome name="building" size={13} color="#1A56F0" style={{ marginRight: 8 }} />
+                        <Text style={s.viewBizText}>View business profile</Text>
+                        <FontAwesome name="chevron-right" size={11} color="#1A56F0" style={{ marginLeft: 'auto' }} />
+                      </TouchableOpacity>
                     )}
                   </View>
                 )}
-
-                {/* View business button */}
-                {lead.business?.slug && (
-                  <TouchableOpacity
-                    style={s.viewBizBtn}
-                    onPress={() => onViewBusiness(lead.business.slug)}>
-                    <Text style={s.viewBizText}>View business profile</Text>
-                    <FontAwesome name="chevron-right" size={11} color="#1A56F0" />
-                  </TouchableOpacity>
-                )}
-              </View>
+              </TouchableOpacity>
             );
           })
         )}
@@ -208,28 +290,43 @@ const s = StyleSheet.create({
   emptyBox: { margin: 24, alignItems: 'center', paddingTop: 40 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 8 },
   emptyText: { fontSize: 13, color: '#6B7280', textAlign: 'center', lineHeight: 20 },
-  card: { marginHorizontal: 14, marginBottom: 12, backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 0.5, borderColor: '#E5E7EB' },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  card: { marginHorizontal: 14, marginBottom: 10, backgroundColor: '#fff', borderRadius: 16, padding: 16, borderWidth: 0.5, borderColor: '#E5E7EB' },
+  cardExpanded: { borderColor: '#1A56F0', borderWidth: 1 },
+  cardTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   bizAvatar: { width: 40, height: 40, borderRadius: 10, backgroundColor: '#1A56F0', justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   bizAvatarText: { color: '#fff', fontWeight: '800', fontSize: 16 },
   bizMeta: { flex: 1 },
   bizName: { fontSize: 14, fontWeight: '700', color: '#111827' },
   dateText: { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
-  statusBadge: { borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4, flexShrink: 0 },
+  cardRight: { alignItems: 'flex-end' },
+  statusBadge: { borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
   statusText: { fontSize: 10, fontWeight: '700' },
-  statusDesc: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  statusDescRow: { flexDirection: 'row', alignItems: 'center' },
   statusDescText: { fontSize: 12, color: '#6B7280', flex: 1 },
-  message: { fontSize: 13, color: '#374151', lineHeight: 20, marginBottom: 10 },
-  quoteBox: { backgroundColor: '#F5F3FF', borderRadius: 12, padding: 12, marginBottom: 10 },
+  statusDescHighlight: { color: '#6D28D9', fontWeight: '600' },
+  expanded: { marginTop: 14, borderTopWidth: 0.5, borderTopColor: '#F3F4F6', paddingTop: 14 },
+  section: { marginBottom: 14 },
+  sectionTitle: { fontSize: 11, fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  messageText: { fontSize: 13, color: '#374151', lineHeight: 20, marginBottom: 8 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  infoText: { fontSize: 12, color: '#6B7280' },
+  quoteBox: { backgroundColor: '#F5F3FF', borderRadius: 12, padding: 12, marginBottom: 12 },
   quoteTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   quoteLabel: { fontSize: 11, fontWeight: '600', color: '#6D28D9', textTransform: 'uppercase', letterSpacing: 0.5 },
-  quoteAmount: { fontSize: 18, fontWeight: '800', color: '#6D28D9' },
-  quoteDesc: { fontSize: 12, color: '#374151', lineHeight: 18, marginBottom: 6 },
+  quoteAmount: { fontSize: 20, fontWeight: '800', color: '#6D28D9' },
+  quoteDesc: { fontSize: 13, color: '#374151', lineHeight: 18, marginBottom: 6 },
   quoteExpiry: { fontSize: 11, color: '#9CA3AF', marginBottom: 10 },
-  acceptBtn: { backgroundColor: '#1A56F0', borderRadius: 10, paddingVertical: 11, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  quoteActions: { flexDirection: 'row', gap: 8 },
+  acceptBtn: { flex: 2, backgroundColor: '#1A56F0', borderRadius: 10, paddingVertical: 11, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   acceptBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  declineBtn: { flex: 1, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', borderRadius: 10, paddingVertical: 11, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  declineBtnText: { color: '#DC2626', fontWeight: '600', fontSize: 13 },
+  whatsappBtn: { flex: 1, backgroundColor: '#25D366', borderRadius: 10, paddingVertical: 11, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  whatsappBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
   acceptedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
   acceptedText: { fontSize: 13, fontWeight: '600', color: '#065F46' },
-  viewBizBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10, borderTopWidth: 0.5, borderTopColor: '#F3F4F6' },
-  viewBizText: { fontSize: 12, color: '#1A56F0', fontWeight: '600' },
+  declinedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
+  declinedText: { fontSize: 13, fontWeight: '600', color: '#991B1B' },
+  viewBizBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', borderRadius: 10, padding: 12 },
+  viewBizText: { fontSize: 13, color: '#1A56F0', fontWeight: '600' },
 });
