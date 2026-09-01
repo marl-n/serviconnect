@@ -34,16 +34,40 @@ export class LeadsService {
       },
     });
   }
+async getCustomerLeads(customerId: string) {
+  const leads = await this.prisma.lead.findMany({
+    where: { customerId },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      quotes: { orderBy: { createdAt: 'desc' }, take: 1 },
+    },
+  });
 
-  async getCustomerLeads(customerId: string) {
-    return this.prisma.lead.findMany({
-      where: { customerId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        quotes: { orderBy: { createdAt: 'desc' }, take: 1 },
-      },
-    });
-  }
+  // Fetch business data separately due to inverted schema relations
+  const businessIds = [...new Set(leads.map(l => l.businessId))];
+  const businesses = await this.prisma.business.findMany({
+    where: { id: { in: businessIds } },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      logoUrl: true,
+      phone: true,
+      whatsapp: true,
+      suburb: true,
+      city: true,
+      isVerified: true,
+      category: { select: { name: true, slug: true } },
+    },
+  });
+
+  const bizMap = Object.fromEntries(businesses.map(b => [b.id, b]));
+
+  return leads.map(lead => ({
+    ...lead,
+    business: bizMap[lead.businessId] ?? null,
+  }));
+}
 
   async updateStatus(leadId: string, userId: string, userRole: UserRole, status: string) {
     const lead = await this.prisma.lead.findUnique({ where: { id: leadId } });
