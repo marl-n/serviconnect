@@ -22,17 +22,15 @@ export default function BusinessProfileScreen({ slug, onBack, onRequestQuote }: 
   const [quoteBusinessName, setQuoteBusinessName] = useState('');
 
   useEffect(() => {
-    Promise.all([
-      businessApi.getBySlug(slug),
-      reviewsApi.getBusinessReviews(slug),
-    ])
-      .then(([bizRes, revRes]) => {
-        setBusiness(bizRes.data);
-        setReviews(revRes.data?.data ?? []);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, [slug]);
+  businessApi.getBySlug(slug)
+    .then(async (bizRes) => {
+      setBusiness(bizRes.data);
+      const revRes = await reviewsApi.getBusinessReviews(bizRes.data.id);
+      setReviews(revRes.data?.data ?? []);
+    })
+    .catch(console.error)
+    .finally(() => setLoading(false));
+}, [slug]);
 
   if (loading) return (
     <View style={s.center}>

@@ -15,14 +15,11 @@ import { FontAwesome } from '@expo/vector-icons';
 import { leadsApi } from '../../services/api';
 import { Lead, LeadStatus } from '../../types';
 import BusinessProfileScreen from './BusinessProfileScreen';
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import ReviewFormScreen from './ReviewFormScreen';
 
 interface Props {
   onViewBusiness?: (slug: string) => void;
 }
-
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<LeadStatus, { bg: string; text: string }> = {
   NEW:       { bg: '#FFF3E0', text: '#B45309' },
@@ -87,12 +84,7 @@ function formatPrice(cents: number): string {
 }
 
 function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map(w => w[0].toUpperCase())
-    .join('');
+  return name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
 }
 
 // ─── Business Avatar ──────────────────────────────────────────────────────────
@@ -121,7 +113,6 @@ function BusinessAvatar({ name, logoUrl }: { name: string; logoUrl?: string | nu
 }
 
 // ─── Contact Buttons ──────────────────────────────────────────────────────────
-// business.phone is not in the Lead type but the API returns it — cast as any safely
 
 function ContactButtons({ lead }: { lead: Lead }) {
   const biz = lead.business as any;
@@ -247,7 +238,6 @@ function QuoteBlock({
         </Text>
       </View>
 
-      {/* PENDING — show accept / decline / discuss */}
       {quote.status === 'PENDING' && !isAccepted && (
         <View style={s.quoteActions}>
           <TouchableOpacity
@@ -278,7 +268,6 @@ function QuoteBlock({
         </View>
       )}
 
-      {/* ACCEPTED — show confirmation + contact buttons */}
       {isAccepted && (
         <View style={s.acceptedSection}>
           <View style={s.acceptedConfirm}>
@@ -317,12 +306,14 @@ function LeadCard({
   onToggle,
   onViewBusiness,
   onReload,
+  onLeaveReview,
 }: {
   lead: Lead;
   isExpanded: boolean;
   onToggle: () => void;
   onViewBusiness: () => void;
   onReload: () => void;
+  onLeaveReview: () => void;
 }) {
   const color = STATUS_COLORS[lead.status] ?? { bg: '#F3F4F6', text: '#374151' };
   const hasQuote = lead.quotes?.length > 0;
@@ -331,10 +322,7 @@ function LeadCard({
 
   return (
     <View style={[s.card, isExpanded && s.cardExpanded, isQuotePending && s.cardHighlighted]}>
-
-      {/* Tappable card header — toggle expand + avatar navigates to profile */}
       <View style={s.cardTop}>
-        {/* Avatar — tappable → business profile */}
         <TouchableOpacity onPress={onViewBusiness} activeOpacity={0.7} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
           <BusinessAvatar
             name={lead.business?.name ?? 'B'}
@@ -342,7 +330,6 @@ function LeadCard({
           />
         </TouchableOpacity>
 
-        {/* Name + date — tappable → toggle expand */}
         <TouchableOpacity style={s.cardMeta} onPress={onToggle} activeOpacity={0.85}>
           <Text style={s.bizName} numberOfLines={1}>
             {lead.business?.name ?? 'Business'}
@@ -358,7 +345,6 @@ function LeadCard({
           </View>
         </TouchableOpacity>
 
-        {/* Status badge + chevron — toggle expand */}
         <TouchableOpacity style={s.cardRight} onPress={onToggle} activeOpacity={0.85} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
           <View style={[s.statusBadge, { backgroundColor: color.bg }]}>
             <Text style={[s.statusText, { color: color.text }]}>
@@ -374,7 +360,6 @@ function LeadCard({
         </TouchableOpacity>
       </View>
 
-      {/* Status hint — collapsed only */}
       {!isExpanded && (
         <TouchableOpacity onPress={onToggle} activeOpacity={0.85}>
           <View style={s.statusHint}>
@@ -391,11 +376,8 @@ function LeadCard({
         </TouchableOpacity>
       )}
 
-      {/* Expanded content */}
       {isExpanded && (
         <View style={s.expandedContent}>
-
-          {/* Your request */}
           <View style={s.expandedSection}>
             <Text style={s.expandedSectionTitle}>Your request</Text>
             <Text style={s.messageText}>{lead.message}</Text>
@@ -413,7 +395,6 @@ function LeadCard({
             )}
           </View>
 
-          {/* Quote */}
           {hasQuote && (
             <QuoteBlock
               lead={lead}
@@ -423,16 +404,19 @@ function LeadCard({
             />
           )}
 
-          {/* Completed placeholder — Leave Review slots in here later */}
           {lead.status === 'COMPLETED' && (
             <View style={s.completedBox}>
-              <FontAwesome name="flag-checkered" size={15} color="#374151" style={{ marginRight: 8 }} />
-              <Text style={s.completedText}>This job is complete.</Text>
-              {/* <TouchableOpacity onPress={onLeaveReview}><Text>Leave a review</Text></TouchableOpacity> */}
+              <View style={s.completedLeft}>
+                <FontAwesome name="flag-checkered" size={15} color="#374151" style={{ marginRight: 8 }} />
+                <Text style={s.completedText}>This job is complete.</Text>
+              </View>
+              <TouchableOpacity onPress={onLeaveReview} style={s.leaveReviewBtn}>
+                <FontAwesome name="star" size={13} color="#FBBF24" style={{ marginRight: 6 }} />
+                <Text style={s.leaveReviewText}>Leave a review</Text>
+              </TouchableOpacity>
             </View>
           )}
 
-          {/* View business profile button */}
           {lead.business?.slug && (
             <TouchableOpacity style={s.viewBizBtn} onPress={onViewBusiness}>
               <FontAwesome name="building" size={13} color="#1A56F0" style={{ marginRight: 8 }} />
@@ -442,7 +426,6 @@ function LeadCard({
               </View>
             </TouchableOpacity>
           )}
-
         </View>
       )}
     </View>
@@ -486,12 +469,14 @@ function EmptyState({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function MyQuotesScreen({ onViewBusiness }: Props) {
+  // All hooks declared at top — no conditional hooks
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<LeadStatus | 'ALL'>('ALL');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [viewingSlug, setViewingSlug] = useState<string | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<{ businessId: string; businessName: string } | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
@@ -523,7 +508,21 @@ export default function MyQuotesScreen({ onViewBusiness }: Props) {
     ? leads
     : leads.filter(l => l.status === activeFilter);
 
-  // All hooks declared — safe to return conditionally
+  // Conditional returns after all hooks
+  if (reviewTarget) {
+    return (
+      <ReviewFormScreen
+        businessId={reviewTarget.businessId}
+        businessName={reviewTarget.businessName}
+        onBack={() => setReviewTarget(null)}
+        onSuccess={() => {
+          setReviewTarget(null);
+          load(true);
+        }}
+      />
+    );
+  }
+
   if (viewingSlug) {
     return (
       <BusinessProfileScreen
@@ -570,7 +569,6 @@ export default function MyQuotesScreen({ onViewBusiness }: Props) {
           />
         }>
 
-        {/* Filter chips */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -593,7 +591,6 @@ export default function MyQuotesScreen({ onViewBusiness }: Props) {
           })}
         </ScrollView>
 
-        {/* Content */}
         {filteredLeads.length === 0 ? (
           <EmptyState
             filter={activeFilter}
@@ -607,8 +604,12 @@ export default function MyQuotesScreen({ onViewBusiness }: Props) {
                 lead={lead}
                 isExpanded={expandedId === lead.id}
                 onToggle={() => setExpandedId(expandedId === lead.id ? null : lead.id)}
-                onViewBusiness={() => setViewingSlug(lead.business?.slug)}
+                onViewBusiness={() => setViewingSlug((lead.business as any)?.slug)}
                 onReload={() => load(true)}
+                onLeaveReview={() => setReviewTarget({
+                  businessId: (lead.business as any)?.id,
+                  businessName: lead.business?.name ?? 'Business',
+                })}
               />
             ))}
           </View>
@@ -708,8 +709,11 @@ const s = StyleSheet.create({
   quoteStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingTop: 10 },
   quoteStatusText: { fontSize: 13, fontWeight: '600' },
 
-  completedBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 10, padding: 12, marginBottom: 12 },
+  completedBox: { backgroundColor: '#F3F4F6', borderRadius: 10, padding: 12, marginBottom: 12 },
+  completedLeft: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   completedText: { fontSize: 13, color: '#374151', fontWeight: '500' },
+  leaveReviewBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF9E6', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, alignSelf: 'flex-start' },
+  leaveReviewText: { fontSize: 12, fontWeight: '700', color: '#B45309' },
 
   viewBizBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', borderRadius: 10, padding: 12, marginTop: 4 },
   viewBizText: { fontSize: 13, color: '#1A56F0', fontWeight: '600', flex: 1 },
