@@ -49,8 +49,14 @@ export const leadsApi = {
 };
 
 export const reviewsApi = {
-  getBusinessReviews: (bizId: string) => api.get(`/reviews/business/${bizId}`),
-  createReview: (data: any) => api.post('/reviews', data),
+  getBusinessReviews: (businessId: string, page = 1) =>
+    api.get(`/reviews/business/${businessId}`, { params: { page } }),
+  getMyReviews: () => api.get('/reviews/my'),
+  canReview: (businessId: string) => api.get(`/reviews/can-review/${businessId}`),
+  createReview: (data: { businessId: string; rating: number; comment?: string }) =>
+    api.post('/reviews', data),
+  replyToReview: (reviewId: string, reply: string) =>
+    api.patch(`/reviews/${reviewId}/reply`, { reply }),
 };
 
 export async function saveToken(token: string) {
