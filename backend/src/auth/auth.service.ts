@@ -46,7 +46,13 @@ export class AuthService {
         data: { phone: normalised, name: name ?? 'New User', role: role ?? UserRole.CUSTOMER },
       });
     } else {
-      await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+     await this.prisma.user.update({
+  where: { id: user.id },
+  data: {
+    lastLoginAt: new Date(),
+    ...(name && user.name === 'New User' ? { name } : {}),
+  },
+});
     }
 
     const token = this.jwt.sign({ sub: user.id, role: user.role });
