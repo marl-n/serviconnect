@@ -5,6 +5,8 @@ import {
 } from 'react-native';
 import { businessApi, reviewsApi } from '../../services/api';
 import RequestQuoteScreen from './RequestQuoteScreen';
+import { savedApi } from '../../services/api';
+import FontAwesome from '@expo/vector-icons/build/FontAwesome';
 
 interface Props {
   slug: string;
@@ -20,17 +22,38 @@ export default function BusinessProfileScreen({ slug, onBack, onRequestQuote }: 
   const [showQuote, setShowQuote] = useState(false);
   const [quoteBusinessId, setQuoteBusinessId] = useState('');
   const [quoteBusinessName, setQuoteBusinessName] = useState('');
+  const [isSaved, setIsSaved] = useState(false);
+const [savingToggle, setSavingToggle] = useState(false);
 
   useEffect(() => {
   businessApi.getBySlug(slug)
     .then(async (bizRes) => {
       setBusiness(bizRes.data);
-      const revRes = await reviewsApi.getBusinessReviews(bizRes.data.id);
+      const [revRes, savedRes] = await Promise.all([
+        reviewsApi.getBusinessReviews(bizRes.data.id),
+        savedApi.isSaved(bizRes.data.id).catch(() => ({ data: { saved: false } })),
+      ]);
       setReviews(revRes.data?.data ?? []);
+      setIsSaved(savedRes.data.saved);
     })
     .catch(console.error)
     .finally(() => setLoading(false));
 }, [slug]);
+
+const toggleSave = async () => {
+  if (savingToggle) return;
+  setSavingToggle(true);
+  const prev = isSaved;
+  setIsSaved(!prev); // optimistic update
+  try {
+    if (prev) await savedApi.unsave(business.id);
+    else await savedApi.save(business.id);
+  } catch {
+    setIsSaved(prev); // revert on failure
+  } finally {
+    setSavingToggle(false);
+  }
+};
 
   if (loading) return (
     <View style={s.center}>
@@ -76,13 +99,22 @@ export default function BusinessProfileScreen({ slug, onBack, onRequestQuote }: 
   return (
     <View style={s.container}>
       <View style={s.header}>
-        <TouchableOpacity onPress={onBack} style={s.backBtn}>
-          <Text style={s.backText}>← Back</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={share} style={s.shareBtn}>
-          <Text style={s.shareText}>Share</Text>
-        </TouchableOpacity>
-      </View>
+  <TouchableOpacity onPress={onBack} style={s.backBtn}>
+    <Text style={s.backText}>← Back</Text>
+  </TouchableOpacity>
+  <View style={{ flexDirection: 'row', gap: 8 }}>
+    <TouchableOpacity onPress={toggleSave} style={s.shareBtn} disabled={savingToggle}>
+      <FontAwesome
+        name={isSaved ? 'heart' : 'heart-o'}
+        size={18}
+        color={isSaved ? '#EF4444' : 'rgba(255,255,255,0.7)'}
+      />
+    </TouchableOpacity>
+    <TouchableOpacity onPress={share} style={s.shareBtn}>
+      <Text style={s.shareText}>Share</Text>
+    </TouchableOpacity>
+  </View>
+</View>
 
       <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
         <View style={s.hero}>

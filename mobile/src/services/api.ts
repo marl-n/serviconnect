@@ -59,6 +59,13 @@ export const reviewsApi = {
     api.patch(`/reviews/${reviewId}/reply`, { reply }),
 };
 
+export const savedApi = {
+  getMySaved: () => api.get('/saved'),
+  isSaved: (businessId: string) => api.get(`/saved/${businessId}/check`),
+  save: (businessId: string) => api.post(`/saved/${businessId}`),
+  unsave: (businessId: string) => api.delete(`/saved/${businessId}`),
+};
+
 export async function saveToken(token: string) {
   await AsyncStorage.setItem(TOKEN_KEY, token);
 }
