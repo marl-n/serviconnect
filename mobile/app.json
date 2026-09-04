@@ -1,5 +1,16 @@
 {
   "plugins": [
     "expo-router"
-  ]
+  ],
+  "extra": {
+    "router": {},
+    "eas": {
+      "projectId": "811e7453-5df8-4fc6-ac1b-bba517bad881"
+    }
+  },
+  "expo": {
+    "android": {
+      "package": "com.loca.serviconnect"
+    }
+  }
 }
