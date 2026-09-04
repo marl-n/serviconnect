@@ -93,23 +93,40 @@ model OtpCode {
 }
 
 model Category {
-  id          String  @id @default(cuid())
-  name        String  @unique
-  slug        String  @unique
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
   icon        String?
   description String?
   parentId    String?
-  sortOrder   Int     @default(0)
-  isActive    Boolean @default(true)
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
 
-  createdAt DateTime @default(now())
-
-  parent     Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  children   Category[] @relation("CategoryTree")
-  businesses Business[]
-  services   Service[]
+  parent        Category?     @relation("CategoryTree", fields: [parentId], references: [id])
+  children      Category[]    @relation("CategoryTree")
+  businesses    Business[]
+  services      Service[]
+  subCategories SubCategory[]
 
   @@index([slug])
+}
+
+// Sub-categories belong to one parent Category.
+// A business selects sub-categories from its own category only.
+model SubCategory {
+  id         String   @id @default(cuid())
+  categoryId String
+  name       String
+  slug       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category              Category              @relation(fields: [categoryId], references: [id])
+  businessSubCategories BusinessSubCategory[]
+
+  @@unique([categoryId, slug])
+  @@index([categoryId])
 }
 
 model Business {
@@ -123,46 +140,52 @@ model Business {
   isVerified  Boolean        @default(false)
   verifiedAt  DateTime?
 
-  address  String?
-  suburb   String?
-  city     String  @default("Johannesburg")
-  province String  @default("Gauteng")
-  lat      Float?
-  lng      Float?
+  address         String?
+  suburb          String?
+  city            String  @default("Johannesburg")
+  province        String  @default("Gauteng")
+  lat             Float?
+  lng             Float?
 
-  phone    String?
-  whatsapp String?
-  email    String?
-  website  String?
+  phone           String?
+  whatsapp        String?
+  email           String?
+  website         String?
 
-  logoUrl        String?
-  coverUrl       String?
-  photos         String[]
-  priceMin       Int?
-  priceMax       Int?
-  operatingHours Json?
+  // logoUrl: primary logo, set via PATCH /businesses/:id { logoUrl }
+  // coverUrl + photos: legacy fields — kept for backwards compatibility.
+  // New gallery functionality uses BusinessGallery instead.
+  logoUrl         String?
+  coverUrl        String?
+  photos          String[]
+
+  priceMin        Int?
+  priceMax        Int?
+  operatingHours  Json?
   yearsInBusiness Int?
 
-  ratingAvg   Float @default(0)
-  reviewCount Int   @default(0)
-  leadCount   Int   @default(0)
-  viewCount   Int   @default(0)
-
+  // System-managed — never writable by clients
+  ratingAvg       Float @default(0)
+  reviewCount     Int   @default(0)
+  leadCount       Int   @default(0)
+  viewCount       Int   @default(0)
   stripeCustomerId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user         User                  @relation(fields: [userId], references: [id])
-  category     Category              @relation(fields: [categoryId], references: [id])
-  services     Service[]
-  leads        Lead[]                @relation("BusinessLeads")
-  reviews      Review[]              @relation("BusinessReviews")
-  ads          Ad[]
-  subscription Subscription?
-  savedBy      SavedBusiness[]
-  verification BusinessVerification?
-  messages     Message[]
+  user                  User                  @relation(fields: [userId], references: [id])
+  category              Category              @relation(fields: [categoryId], references: [id])
+  services              Service[]
+  leads                 Lead[]                @relation("BusinessLeads")
+  reviews               Review[]              @relation("BusinessReviews")
+  ads                   Ad[]
+  subscription          Subscription?
+  savedBy               SavedBusiness[]
+  verification          BusinessVerification?
+  messages              Message[]
+  subCategories         BusinessSubCategory[]
+  gallery               BusinessGallery[]
 
   @@index([slug])
   @@index([categoryId])
@@ -170,6 +193,33 @@ model Business {
   @@index([lat, lng])
   @@index([status, isVerified])
   @@index([ratingAvg])
+}
+
+// Many-to-many: Business <-> SubCategory
+model BusinessSubCategory {
+  businessId    String
+  subCategoryId String
+
+  business    Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  subCategory SubCategory @relation(fields: [subCategoryId], references: [id], onDelete: Cascade)
+
+  @@id([businessId, subCategoryId])
+  @@index([businessId])
+}
+
+// Project gallery — max 12 images per business, ordered by sortOrder
+model BusinessGallery {
+  id         String   @id @default(cuid())
+  businessId String
+  imageUrl   String
+  caption    String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, sortOrder])
 }
 
 model BusinessVerification {
@@ -253,16 +303,16 @@ model Quote {
 }
 
 model Review {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   customerId String
   businessId String
   leadId     String?
   rating     Int
   comment    String?
-  isVerified Boolean  @default(false)
+  isVerified Boolean   @default(false)
   reply      String?
   repliedAt  DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   customer User     @relation("CustomerReviews", fields: [customerId], references: [id])
   business Business @relation("BusinessReviews", fields: [businessId], references: [id])
@@ -284,15 +334,15 @@ model SavedBusiness {
 }
 
 model Message {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   leadId     String
   senderId   String
   businessId String
   content    String?
   voiceUrl   String?
-  type       String   @default("TEXT")
+  type       String    @default("TEXT")
   readAt     DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   lead     Lead     @relation(fields: [leadId], references: [id])
   sender   User     @relation("SentMessages", fields: [senderId], references: [id])
@@ -302,16 +352,16 @@ model Message {
 }
 
 model Subscription {
-  id                 String   @id @default(cuid())
-  businessId         String   @unique
+  id                 String             @id @default(cuid())
+  businessId         String             @unique
   plan               SubscriptionPlan   @default(STARTER)
   status             SubscriptionStatus @default(TRIALING)
-  stripeSubId        String?  @unique
+  stripeSubId        String?            @unique
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
   cancelledAt        DateTime?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
 
   business Business @relation(fields: [businessId], references: [id])
 }
