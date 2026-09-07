@@ -34,6 +34,27 @@ export const businessApi = {
   getDashboard: () => api.get('/businesses/me/dashboard'),
   create: (data: any) => api.post('/businesses', data),
   update: (id: string, data: any) => api.patch(`/businesses/${id}`, data),
+  getSubCategories: (categoryId: string) =>
+    api.get(`/businesses/category/${categoryId}/subcategories`),
+};
+
+export const categoryQuestionsApi = {
+  list: (categoryId: string, subCategoryId?: string) =>
+    api.get('/category-questions', { params: { categoryId, subCategoryId } }),
+};
+
+export const serviceRequestsApi = {
+  create: (data: {
+    categoryId: string;
+    subCategoryId: string;
+    message: string;
+    jobAddress?: string;
+    jobDate?: string;
+    budget?: number;
+    answers?: Record<string, unknown>;
+  }) => api.post('/service-requests', data),
+  getMine: () => api.get('/service-requests/my'),
+  getById: (id: string) => api.get(`/service-requests/${id}`),
 };
 
 export const leadsApi = {

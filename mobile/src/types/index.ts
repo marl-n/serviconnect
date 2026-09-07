@@ -1,10 +1,76 @@
 export type UserRole = 'CUSTOMER' | 'BUSINESS' | 'ADMIN';
 export type LeadStatus = 'NEW' | 'VIEWED' | 'QUOTED' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED';
 export type QuoteStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
+export type QuestionType = 'TEXT' | 'NUMBER' | 'SELECT' | 'MULTISELECT' | 'BOOLEAN' | 'DATE';
+export type ServiceRequestStatus = 'OPEN' | 'MATCHED' | 'EXPIRED' | 'CANCELLED' | 'FULFILLED';
 
 export interface User {
   id: string; phone: string; name: string; avatarUrl?: string; role: UserRole;
   business?: { id: string; name: string; slug: string; status: string; isVerified: boolean };
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  icon?: string;
+  description?: string;
+  parentId?: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  _count?: { businesses: number };
+}
+
+export interface SubCategory {
+  id: string;
+  categoryId: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CategoryQuestion {
+  id: string;
+  categoryId: string;
+  subCategoryId?: string;
+  key: string;
+  label: string;
+  type: QuestionType;
+  options?: unknown;
+  isRequired: boolean;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ServiceRequestLead {
+  id: string;
+  businessId: string;
+  status: LeadStatus;
+  isUnlocked: boolean;
+}
+
+export interface ServiceRequest {
+  id: string;
+  customerId: string;
+  categoryId: string;
+  subCategoryId: string;
+  message: string;
+  jobAddress?: string;
+  jobDate?: string;
+  budget?: number;
+  answers?: Record<string, unknown>;
+  status: ServiceRequestStatus;
+  expiresAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Present on getMine()/getById() responses
+  category?: Pick<Category, 'id' | 'name' | 'slug'>;
+  subCategory?: Pick<SubCategory, 'id' | 'name' | 'slug'>;
+  // Present on getMine() only
+  leads?: ServiceRequestLead[];
 }
 
 export interface Business {
