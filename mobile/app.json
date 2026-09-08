@@ -11,6 +11,10 @@
   "expo": {
     "android": {
       "package": "com.loca.serviconnect"
-    }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ]
   }
 }
