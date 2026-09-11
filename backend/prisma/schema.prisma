@@ -29,6 +29,38 @@ enum LeadStatus {
   COMPLETED
 }
 
+enum ServiceRequestStatus {
+  OPEN
+  MATCHED
+  EXPIRED
+  CANCELLED
+  FULFILLED
+}
+
+enum QuestionType {
+  TEXT
+  NUMBER
+  SELECT
+  MULTISELECT
+  BOOLEAN
+  DATE
+}
+
+enum CreditTransactionType {
+  PURCHASE
+  PROMOTIONAL
+  LEAD_UNLOCK
+  REFUND
+  ADMIN_ADJUSTMENT
+}
+
+enum CreditPurchaseStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
 enum QuoteStatus {
   PENDING
   ACCEPTED
@@ -73,6 +105,7 @@ model User {
   savedBusinesses SavedBusiness[]
   sentMessages    Message[]       @relation("SentMessages")
   otps            OtpCode[]
+  serviceRequests ServiceRequest[]
 
   @@index([phone])
   @@index([role])
@@ -103,11 +136,13 @@ model Category {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
 
-  parent        Category?     @relation("CategoryTree", fields: [parentId], references: [id])
-  children      Category[]    @relation("CategoryTree")
-  businesses    Business[]
-  services      Service[]
-  subCategories SubCategory[]
+  parent          Category?        @relation("CategoryTree", fields: [parentId], references: [id])
+  children        Category[]       @relation("CategoryTree")
+  businesses      Business[]
+  services        Service[]
+  subCategories   SubCategory[]
+  serviceRequests ServiceRequest[]
+  questions       CategoryQuestion[]
 
   @@index([slug])
 }
@@ -124,9 +159,60 @@ model SubCategory {
 
   category              Category              @relation(fields: [categoryId], references: [id])
   businessSubCategories BusinessSubCategory[]
+  serviceRequests       ServiceRequest[]
+  questions             CategoryQuestion[]
 
   @@unique([categoryId, slug])
   @@index([categoryId])
+}
+
+// Defines the dynamic per-category (or per-subcategory) question schema
+// used to build the customer-facing ServiceRequest form.
+// subCategoryId = null means the question applies to the whole category.
+model CategoryQuestion {
+  id            String       @id @default(cuid())
+  categoryId    String
+  subCategoryId String?
+  key           String       // JSON key used in ServiceRequest.answers
+  label         String
+  type          QuestionType
+  options       Json?        // choices for SELECT / MULTISELECT
+  isRequired    Boolean      @default(false)
+  sortOrder     Int          @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  category    Category     @relation(fields: [categoryId], references: [id])
+  subCategory SubCategory? @relation(fields: [subCategoryId], references: [id])
+
+  @@index([categoryId, subCategoryId])
+}
+
+// A marketplace request submitted by a customer, independent of any
+// specific business. Matching produces one Lead per eligible business.
+model ServiceRequest {
+  id            String               @id @default(cuid())
+  customerId    String
+  categoryId    String
+  subCategoryId String
+  message       String
+  jobAddress    String?
+  jobDate       DateTime?
+  budget        Int?
+  answers       Json?
+  status        ServiceRequestStatus @default(OPEN)
+  expiresAt     DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  customer    User        @relation(fields: [customerId], references: [id])
+  category    Category    @relation(fields: [categoryId], references: [id])
+  subCategory SubCategory @relation(fields: [subCategoryId], references: [id])
+  leads       Lead[]
+
+  @@index([customerId])
+  @@index([categoryId, subCategoryId])
+  @@index([status])
 }
 
 model Business {
@@ -186,6 +272,8 @@ model Business {
   messages              Message[]
   subCategories         BusinessSubCategory[]
   gallery               BusinessGallery[]
+  wallet                BusinessWallet?
+  creditPurchases       CreditPurchase[]
 
   @@index([slug])
   @@index([categoryId])
@@ -268,6 +356,15 @@ model Lead {
   jobDate      DateTime?
   budget       Int?
 
+  // --- Marketplace fields (all nullable/defaulted for backward compatibility
+  // with existing direct-to-business leads, where serviceRequestId is null) ---
+  serviceRequestId  String?           // null = legacy direct-to-business lead
+  creditCost        Int?              // credit price snapshot at match time; null for legacy leads
+  isUnlocked        Boolean  @default(true)  // legacy leads are already "unlocked" by definition
+  unlockedAt        DateTime?
+  unlockTransactionId String?  @unique       // pointer to the CreditTransaction that unlocked this lead
+  expiresAt         DateTime?         // staleness window for an unpurchased marketplace opportunity
+
   viewedAt    DateTime?
   respondedAt DateTime?
   completedAt DateTime?
@@ -275,15 +372,21 @@ model Lead {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  customer Business @relation("BusinessLeads", fields: [businessId], references: [id])
-  business User     @relation("CustomerLeads", fields: [customerId], references: [id])
-  service  Service? @relation(fields: [serviceId], references: [id])
+  customer       User            @relation("CustomerLeads", fields: [customerId], references: [id])
+  business       Business        @relation("BusinessLeads", fields: [businessId], references: [id])
+  service        Service?        @relation(fields: [serviceId], references: [id])
+  serviceRequest ServiceRequest? @relation(fields: [serviceRequestId], references: [id])
+  unlockTransaction CreditTransaction? @relation("LeadUnlockTransaction", fields: [unlockTransactionId], references: [id])
+  creditTransactions CreditTransaction[] @relation("LeadCreditTransactions")
   quotes   Quote[]
   messages Message[]
 
+  @@unique([serviceRequestId, businessId])
   @@index([businessId, status])
   @@index([customerId])
   @@index([createdAt])
+  @@index([serviceRequestId])
+  @@index([isUnlocked])
 }
 
 model Quote {
@@ -396,6 +499,72 @@ model Payment {
   status      String   @default("pending")
   description String?
   createdAt   DateTime @default(now())
+
+  creditPurchase CreditPurchase?
+
+  @@index([businessId])
+}
+
+// One wallet per business. `balance` is a cached/derived value kept in sync
+// with CreditTransaction inside the same DB transaction as every ledger
+// write — CreditTransaction remains the authoritative audit trail; this
+// balance plus (isUnlocked/unlockedAt/unlockTransactionId on Lead) is the
+// authoritative *current state*.
+model BusinessWallet {
+  id         String   @id @default(cuid())
+  businessId String   @unique
+  balance    Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  business     Business            @relation(fields: [businessId], references: [id])
+  transactions CreditTransaction[]
+}
+
+// Append-only ledger. Rows are never updated or deleted after creation.
+model CreditTransaction {
+  id                 String                @id @default(cuid())
+  walletId           String
+  amount             Int                   // signed: positive = credit, negative = debit
+  balanceAfter       Int                   // wallet balance snapshot immediately after this entry
+  type               CreditTransactionType
+  reason             String?               // required in practice for REFUND / ADMIN_ADJUSTMENT
+  relatedLeadId      String?
+  relatedPurchaseId  String?
+  performedByUserId  String?               // admin/system actor; null = automated
+  idempotencyKey     String?               @unique
+  createdAt          DateTime              @default(now())
+
+  wallet          BusinessWallet  @relation(fields: [walletId], references: [id])
+  lead            Lead?           @relation("LeadCreditTransactions", fields: [relatedLeadId], references: [id])
+  purchase        CreditPurchase? @relation(fields: [relatedPurchaseId], references: [id])
+  unlockedLead    Lead?           @relation("LeadUnlockTransaction")
+
+  @@index([walletId, createdAt])
+  @@index([relatedLeadId])
+  @@index([relatedPurchaseId])
+}
+
+// "Money in" record for a business buying a credit pack. Kept separate from
+// the generic Payment model (credit purchases have purchase-specific fields
+// like `credits` and a unique Stripe PaymentIntent id), but optionally
+// linked to a Payment row so future admin revenue reporting can aggregate
+// credit purchases alongside subscriptions/ads from one table.
+model CreditPurchase {
+  id                    String               @id @default(cuid())
+  businessId            String
+  credits               Int
+  amountCents           Int
+  currency              String               @default("ZAR")
+  status                CreditPurchaseStatus @default(PENDING)
+  stripePaymentIntentId String?              @unique
+  paymentId             String?              @unique
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  business     Business            @relation(fields: [businessId], references: [id])
+  payment      Payment?            @relation(fields: [paymentId], references: [id])
+  transactions CreditTransaction[]
 
   @@index([businessId])
 }

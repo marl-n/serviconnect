@@ -9,6 +9,9 @@ import { LeadsModule } from './leads/leads.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { AdminModule } from './admin/admin.module';
+   import { CreditsModule } from './credits/credits.module';
+   import { ServiceRequestsModule } from './service-requests/service-requests.module';
+   import { CategoryQuestionsModule } from './category-questions/category-questions.module';
 
 @Module({
   imports: [
@@ -22,6 +25,9 @@ import { AdminModule } from './admin/admin.module';
     ReviewsModule,
     UploadsModule,
     AdminModule,
+    CreditsModule,
+    ServiceRequestsModule,
+    CategoryQuestionsModule,
   ],
 })
 export class AppModule {}
