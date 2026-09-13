@@ -71,7 +71,8 @@ const questionGroups: QuestionGroup[] = [
     questions: [
       { key: 'workType', label: 'What do you need done?', type: 'SELECT', isRequired: true,
         options: ['New paving', 'Replace existing paving', 'Repair existing paving', 'Extend existing paved area', 'Not sure'] },
-      { key: 'areaSqm', label: 'Approximately how large is the area? (m²)', type: 'NUMBER', isRequired: true },
+      { key: 'areaSqm', label: 'Approximately how large is the area? (m²)', type: 'SELECT', isRequired: true,
+        options: ['Under 100 m²', '100–200 m²', '200–500 m²', '500–1,000 m²', '1,000+ m²', 'Not sure'] },
       { key: 'currentSurface', label: 'What is the current surface?', type: 'SELECT', isRequired: true,
         options: ['Soil / grass', 'Concrete', 'Existing paving', 'Gravel', 'Asphalt / tar', 'Other'] },
       { key: 'pavingType', label: 'What type of paving are you looking for?', type: 'SELECT', isRequired: true,
@@ -92,7 +93,8 @@ const questionGroups: QuestionGroup[] = [
     questions: [
       { key: 'parkingType', label: 'What type of parking area is this?', type: 'SELECT', isRequired: true,
         options: ['Residential', 'Office', 'Retail', 'Industrial', 'Complex / estate', 'Other'] },
-      { key: 'areaSqm', label: 'Approximate area (m²)', type: 'NUMBER', isRequired: true },
+      { key: 'areaSqm', label: 'Approximate area (m²)', type: 'SELECT', isRequired: true,
+        options: ['Under 100 m²', '100–200 m²', '200–500 m²', '500–1,000 m²', '1,000+ m²', 'Not sure'] },
       { key: 'currentSurface', label: 'What is the current surface?', type: 'SELECT', isRequired: true,
         options: ['Soil', 'Gravel', 'Concrete', 'Existing paving', 'Asphalt / tar', 'Other'] },
       { key: 'vehicleCount', label: 'Approximately how many vehicles will it accommodate?', type: 'NUMBER', isRequired: false },
@@ -126,7 +128,8 @@ const questionGroups: QuestionGroup[] = [
     questions: [
       { key: 'projectGoal', label: 'What are you looking to create?', type: 'SELECT', isRequired: true,
         options: ['New garden', 'Redesign existing garden', 'Lawn installation', 'Planting', 'Hard landscaping', 'Full landscaping project', 'Other'] },
-      { key: 'gardenSizeSqm', label: 'Approximate garden size (m²)', type: 'NUMBER', isRequired: false },
+      { key: 'gardenSizeSqm', label: 'Approximate garden size (m²)', type: 'SELECT', isRequired: false,
+        options: ['Under 100 m²', '100–200 m²', '200–500 m²', '500–1,000 m²', '1,000+ m²', 'Not sure'] },
       { key: 'elementsRequired', label: 'What elements are required?', type: 'MULTISELECT', isRequired: true,
         options: ['Lawn', 'Plants', 'Flower beds', 'Paving', 'Retaining walls', 'Water features', 'Irrigation', 'Lighting', 'Other'] },
       { key: 'hasDesign', label: 'Do you already have a design/plan?', type: 'SELECT', isRequired: true,
@@ -142,7 +145,7 @@ const questionGroups: QuestionGroup[] = [
       { key: 'removalItems', label: 'What needs to be removed?', type: 'MULTISELECT', isRequired: true,
         options: ['Garden waste', 'Overgrown vegetation', 'Leaves', 'Branches', 'Grass/weeds', 'General garden waste', 'Other'] },
       { key: 'areaSize', label: 'Approximate size of the area?', type: 'SELECT', isRequired: true,
-        options: ['Small', 'Medium', 'Large', 'Not sure'] },
+        options: ['Under 100 m²', '100–200 m²', '200–500 m²', '500–1,000 m²', '1,000+ m²', 'Not sure'] },
       { key: 'wasteRemoval', label: 'Is waste removal required?', type: 'BOOLEAN', isRequired: true },
     ],
   },
@@ -270,7 +273,8 @@ const questionGroups: QuestionGroup[] = [
       { key: 'roofType', label: 'What type of roof?', type: 'SELECT', isRequired: true,
         options: ['Tile', 'Corrugated metal', 'IBR', 'Flat roof', 'Other', 'Not sure'] },
       { key: 'currentlyLeaking', label: 'Is the roof currently leaking?', type: 'BOOLEAN', isRequired: true },
-      { key: 'roofSizeSqm', label: 'Approximate roof size (m²)', type: 'NUMBER', isRequired: false },
+      { key: 'roofSizeSqm', label: 'What best describes the roof/project size?', type: 'SELECT', isRequired: false,
+        options: ['Small — e.g. porch or outbuilding', 'Medium — e.g. garage', 'Large — e.g. house', 'Extra large — e.g. warehouse', 'Conservatory', 'Other', 'Not sure'] },
     ],
   },
 

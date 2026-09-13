@@ -38,6 +38,7 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [questionsError, setQuestionsError] = useState(false);
   const [answers, setAnswers] = useState<Answers>({});
+  const [questionIndex, setQuestionIndex] = useState(0);
 
   // Step 4 — general details
   const [message, setMessage] = useState('');
@@ -105,22 +106,40 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
     setSubCategoryId(sub.id);
     setSubCategoryName(sub.name);
     setAnswers({});
+    setQuestionIndex(0);
     setStep(3);
     loadQuestions(categoryId, sub.id);
   };
 
-  const goToDetails = () => {
-    const missing = questions
-      .filter(q => q.isRequired)
-      .filter(q => {
-        const v = answers[q.key];
-        return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
-      });
-    if (missing.length > 0) {
-      Alert.alert('Required', `Please answer: ${missing.map(q => q.label).join(', ')}`);
+  const isAnswerMissing = (q: CategoryQuestion) => {
+    const v = answers[q.key];
+    return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
+  };
+
+  // Validates only the currently displayed question, then either advances
+  // to the next question or — on the final question — continues to the
+  // existing Details step.
+  const questionContinue = () => {
+    const q = questions[questionIndex];
+    if (q && q.isRequired && isAnswerMissing(q)) {
+      Alert.alert('Required', `Please answer: ${q.label}`);
       return;
     }
-    setStep(4);
+    if (questionIndex < questions.length - 1) {
+      setQuestionIndex(questionIndex + 1);
+    } else {
+      setStep(4);
+    }
+  };
+
+  // Steps back one question, preserving all collected answers. From the
+  // first question, falls back to the subcategory step.
+  const questionBack = () => {
+    if (questionIndex > 0) {
+      setQuestionIndex(questionIndex - 1);
+    } else {
+      setStep(2);
+    }
   };
 
   const goBack = () => {
@@ -144,6 +163,7 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
     setSubCategories([]);
     setQuestions([]);
     setAnswers({});
+    setQuestionIndex(0);
     setMessage('');
     setJobAddress('');
     setJobDate('');
@@ -410,7 +430,10 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
             <Text style={s.infoText}>No additional questions for this service — you can continue.</Text>
           </View>
         ) : (
-          questions.map(renderQuestion)
+          <>
+            <Text style={s.questionProgress}>Question {questionIndex + 1} of {questions.length}</Text>
+            {renderQuestion(questions[questionIndex])}
+          </>
         )}
       </>
     );
@@ -508,10 +531,23 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
         {step === 3 && renderStep3()}
         {step === 4 && renderStep4()}
 
-        {step === 3 && !questionsLoading && !questionsError && (
+        {step === 3 && !questionsLoading && !questionsError && questions.length === 0 && (
           <View style={s.actions}>
-            <TouchableOpacity style={s.nextBtn} onPress={goToDetails}>
+            <TouchableOpacity style={s.nextBtn} onPress={() => setStep(4)}>
               <Text style={s.nextBtnText}>Continue</Text>
+              <FontAwesome name="arrow-right" size={14} color="#fff" style={{ marginLeft: 8 }} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {step === 3 && !questionsLoading && !questionsError && questions.length > 0 && (
+          <View style={s.questionNavRow}>
+            <TouchableOpacity style={s.backQuestionBtn} onPress={questionBack}>
+              <FontAwesome name="arrow-left" size={14} color="#374151" />
+              <Text style={s.backQuestionBtnText}>Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.nextBtn, s.nextBtnFlex]} onPress={questionContinue}>
+              <Text style={s.nextBtnText}>{questionIndex === questions.length - 1 ? 'Continue' : 'Next'}</Text>
               <FontAwesome name="arrow-right" size={14} color="#fff" style={{ marginLeft: 8 }} />
             </TouchableOpacity>
           </View>
@@ -580,4 +616,9 @@ const s = StyleSheet.create({
   nextBtn: { backgroundColor: '#1A56F0', borderRadius: 14, paddingVertical: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   btnDisabled: { opacity: 0.5 },
   nextBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  questionProgress: { fontSize: 12, fontWeight: '700', color: '#1A56F0', marginBottom: 14, letterSpacing: 0.3 },
+  questionNavRow: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  nextBtnFlex: { flex: 1 },
+  backQuestionBtn: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, paddingVertical: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  backQuestionBtnText: { color: '#374151', fontWeight: '700', fontSize: 15 },
 });
