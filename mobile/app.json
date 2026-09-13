@@ -1,15 +1,20 @@
 {
-  "android": {
-    "package": "com.loca.serviconnect"
-  },
-  "plugins": [
-    "expo-router",
-    "expo-font"
-  ],
-  "extra": {
-    "router": {},
-    "eas": {
-      "projectId": "811e7453-5df8-4fc6-ac1b-bba517bad881"
+  "expo": {
+    "name": "ServiConnect",
+    "slug": "serviconnect",
+    "scheme": "serviconnect",
+    "android": {
+      "package": "com.loca.serviconnect"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "811e7453-5df8-4fc6-ac1b-bba517bad881"
+      }
     }
   }
 }
