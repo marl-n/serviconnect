@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, Switch,
+  View, Text, TextInput, TouchableOpacity, Image,
   StyleSheet, ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { searchApi, businessApi, categoryQuestionsApi, serviceRequestsApi } from '../../services/api';
 import { Category, SubCategory, CategoryQuestion } from '../../types';
 
@@ -15,6 +16,7 @@ interface Props {
 type Answers = Record<string, unknown>;
 
 const TOTAL_STEPS = 4;
+const MAX_PHOTOS = 5;
 
 export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
   const [step, setStep] = useState(1);
@@ -45,6 +47,7 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
   const [jobAddress, setJobAddress] = useState('');
   const [jobDate, setJobDate] = useState('');
   const [budget, setBudget] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -168,6 +171,31 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
     setJobAddress('');
     setJobDate('');
     setBudget('');
+    setPhotos([]);
+  };
+
+  // Optional photos: opens the system photo library (multi-select) and keeps
+  // the chosen image URIs in local state.
+  const pickPhotos = async () => {
+    const remaining = MAX_PHOTOS - photos.length;
+    if (remaining <= 0) return;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
+        quality: 0.7,
+      });
+      if (result.canceled) return;
+      const picked = result.assets.map(a => a.uri);
+      setPhotos(prev => Array.from(new Set([...prev, ...picked])).slice(0, MAX_PHOTOS));
+    } catch {
+      Alert.alert('Error', 'Could not open your photo library. Please try again.');
+    }
+  };
+
+  const removePhoto = (uri: string) => {
+    setPhotos(prev => prev.filter(u => u !== uri));
   };
 
   const submit = async () => {
@@ -353,14 +381,19 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
         )}
 
         {q.type === 'BOOLEAN' && (
-          <View style={s.switchRow}>
-            <Switch
-              value={!!value}
-              onValueChange={val => setAnswer(q.key, val)}
-              trackColor={{ false: '#E5E7EB', true: '#1A56F0' }}
-              thumbColor="#fff"
-            />
-            <Text style={s.switchLabel}>{value ? 'Yes' : 'No'}</Text>
+          <View style={s.booleanRow}>
+            {([{ label: 'Yes', val: true }, { label: 'No', val: false }] as const).map(opt => {
+              const selected = value === opt.val;
+              return (
+                <TouchableOpacity
+                  key={opt.label}
+                  style={[s.optionItem, s.booleanOption, selected && s.optionItemActive]}
+                  onPress={() => setAnswer(q.key, opt.val)}>
+                  <Text style={[s.optionText, selected && s.optionTextActive]}>{opt.label}</Text>
+                  {selected && <FontAwesome name="check" size={13} color="#1A56F0" />}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
 
@@ -448,7 +481,7 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
         <Text style={s.label}>Describe the job <Text style={s.required}>*</Text></Text>
         <TextInput
           style={[s.input, s.textArea]}
-          placeholder="e.g. I need a tar driveway surfaced, approximately 80sqm. Looking for a quote including materials and labour."
+          placeholder="Add any additional details about what you need..."
           placeholderTextColor="#9CA3AF"
           value={message}
           onChangeText={setMessage}
@@ -471,17 +504,7 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
         />
       </View>
 
-      <View style={s.field}>
-        <Text style={s.label}>Preferred date</Text>
-        <TextInput
-          style={s.input}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor="#9CA3AF"
-          value={jobDate}
-          onChangeText={setJobDate}
-        />
-        <Text style={s.hint}>Optional</Text>
-      </View>
+    
 
       <View style={s.field}>
         <Text style={s.label}>Your budget (R)</Text>
@@ -494,6 +517,32 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
           keyboardType="numeric"
         />
         <Text style={s.hint}>Optional — helps businesses give you an accurate quote</Text>
+      </View>
+
+      <View style={s.field}>
+        <Text style={s.label}>Add photos</Text>
+        {photos.length > 0 && (
+          <View style={s.photoGrid}>
+            {photos.map(uri => (
+              <View key={uri} style={s.photoThumbWrap}>
+                <Image source={{ uri }} style={s.photoThumb} />
+                <TouchableOpacity
+                  style={s.photoRemoveBtn}
+                  onPress={() => removePhoto(uri)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <FontAwesome name="times" size={11} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+        {photos.length < MAX_PHOTOS && (
+          <TouchableOpacity style={s.photoAddBtn} onPress={pickPhotos}>
+            <FontAwesome name="camera" size={14} color="#1A56F0" />
+            <Text style={s.photoAddBtnText}>{photos.length === 0 ? 'Add photos' : 'Add more photos'}</Text>
+          </TouchableOpacity>
+        )}
+        <Text style={s.hint}>Optional — up to {MAX_PHOTOS} photos</Text>
       </View>
 
       <View style={s.infoBox}>
@@ -597,8 +646,14 @@ const s = StyleSheet.create({
   hint: { fontSize: 11, color: '#9CA3AF', marginTop: 5 },
   listItem: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   listItemText: { fontSize: 14, fontWeight: '600', color: '#111827' },
-  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  switchLabel: { fontSize: 14, color: '#374151', fontWeight: '500' },
+  booleanRow: { flexDirection: 'row', gap: 10 },
+  booleanOption: { flex: 1, justifyContent: 'center', gap: 8 },
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 10 },
+  photoThumbWrap: { width: 76, height: 76 },
+  photoThumb: { width: 76, height: 76, borderRadius: 12, backgroundColor: '#E5E7EB' },
+  photoRemoveBtn: { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: '#EF4444', justifyContent: 'center', alignItems: 'center' },
+  photoAddBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, backgroundColor: '#fff', borderWidth: 1, borderColor: '#BFDBFE', borderStyle: 'dashed', borderRadius: 12, paddingVertical: 14 },
+  photoAddBtnText: { color: '#1A56F0', fontWeight: '700', fontSize: 14 },
   optionList: { gap: 8 },
   optionItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12 },
   optionItemActive: { backgroundColor: '#EFF6FF', borderColor: '#1A56F0' },
