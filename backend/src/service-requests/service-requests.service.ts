@@ -22,8 +22,26 @@ export class ServiceRequestsService {
     }
   }
 
+  /** Town must exist; suburb (optional) must exist and belong to that town. */
+  private async validateLocation(townId?: string, suburbId?: string) {
+    if (!townId && !suburbId) return;
+    if (!townId) throw new BadRequestException('A suburb can only be chosen together with its town');
+
+    const town = await this.prisma.town.findUnique({ where: { id: townId } });
+    if (!town) throw new BadRequestException(`Town ${townId} not found`);
+
+    if (suburbId) {
+      const suburb = await this.prisma.suburb.findUnique({ where: { id: suburbId } });
+      if (!suburb) throw new BadRequestException(`Suburb ${suburbId} not found`);
+      if (suburb.townId !== townId) {
+        throw new BadRequestException('Suburb does not belong to the given town');
+      }
+    }
+  }
+
   async create(customerId: string, dto: CreateServiceRequestDto) {
     await this.validateCategoryPair(dto.categoryId, dto.subCategoryId);
+    await this.validateLocation(dto.townId, dto.suburbId);
     await this.categoryQuestions.validateAnswers(dto.categoryId, dto.subCategoryId, dto.answers);
 
     // NOTE: matching businesses to this request and generating Lead rows is
@@ -36,6 +54,8 @@ export class ServiceRequestsService {
         categoryId: dto.categoryId,
         subCategoryId: dto.subCategoryId,
         message: dto.message,
+        townId: dto.townId,
+        suburbId: dto.suburbId,
         jobAddress: dto.jobAddress,
         jobDate: dto.jobDate ? new Date(dto.jobDate) : undefined,
         budget: dto.budget,
@@ -52,6 +72,8 @@ export class ServiceRequestsService {
       include: {
         category: { select: { id: true, name: true, slug: true } },
         subCategory: { select: { id: true, name: true, slug: true } },
+        town: { select: { id: true, name: true, province: { select: { id: true, name: true } } } },
+        suburb: { select: { id: true, name: true } },
         leads: { select: { id: true, businessId: true, status: true, isUnlocked: true } },
       },
     });
@@ -63,6 +85,8 @@ export class ServiceRequestsService {
       include: {
         category: { select: { id: true, name: true, slug: true } },
         subCategory: { select: { id: true, name: true, slug: true } },
+        town: { select: { id: true, name: true, province: { select: { id: true, name: true } } } },
+        suburb: { select: { id: true, name: true } },
       },
     });
     if (!request) throw new NotFoundException('Service request not found');

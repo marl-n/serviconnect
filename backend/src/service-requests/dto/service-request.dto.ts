@@ -17,6 +17,19 @@ export class CreateServiceRequestDto {
   @MaxLength(2000)
   message: string;
 
+  // Structured job location (see LocationsModule). Optional for now so the
+  // existing mobile client keeps working; suburb is always optional and
+  // requires a town.
+  @ApiPropertyOptional({ description: 'Town/city where the job is located' })
+  @IsOptional()
+  @IsString()
+  townId?: string;
+
+  @ApiPropertyOptional({ description: 'Suburb within the town (optional)' })
+  @IsOptional()
+  @IsString()
+  suburbId?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

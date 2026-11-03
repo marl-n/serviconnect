@@ -5,6 +5,8 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { BusinessesService } from './businesses.service';
+import { LocationsService } from '../locations/locations.service';
+import { SetServiceAreasDto } from '../locations/dto/locations.dto';
 import {
   CreateBusinessDto,
   UpdateBusinessDto,
@@ -20,7 +22,10 @@ import { CurrentUser, Public, Roles } from '../common/decorators/index';
 @ApiTags('Businesses')
 @Controller('businesses')
 export class BusinessesController {
-  constructor(private biz: BusinessesService) {}
+  constructor(
+    private biz: BusinessesService,
+    private locations: LocationsService,
+  ) {}
 
   // ─── Public ─────────────────────────────────────────────────────────────────
 
@@ -122,6 +127,28 @@ export class BusinessesController {
     @Body() dto: SetSubCategoriesDto,
   ) {
     return this.biz.setSubCategories(id, user.sub, dto);
+  }
+
+  // ─── Service areas (towns a business serves) ─────────────────────────────────
+
+  @Public()
+  @Get(':id/service-areas')
+  @ApiOperation({ summary: 'Get the towns a business serves' })
+  getServiceAreas(@Param('id') id: string) {
+    return this.locations.getBusinessServiceAreas(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.BUSINESS)
+  @Post(':id/service-areas')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Set the towns a business serves (replaces existing)' })
+  setServiceAreas(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: SetServiceAreasDto,
+  ) {
+    return this.locations.setBusinessServiceAreas(id, user.sub, dto.townIds);
   }
 
   // ─── Gallery — owner ─────────────────────────────────────────────────────────

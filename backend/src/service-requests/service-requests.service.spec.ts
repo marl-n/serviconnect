@@ -8,8 +8,12 @@ function makeFakePrisma() {
     { id: 'sub-wiring', categoryId: 'cat-OTHER', name: 'Wiring', slug: 'wiring' },
   ];
   const requests: any[] = [];
+  const towns = [{ id: 't-jhb', name: 'Johannesburg' }, { id: 't-pta', name: 'Pretoria' }];
+  const suburbs = [{ id: 's-san', name: 'Sandton', townId: 't-jhb' }];
 
   return {
+    town: { findUnique: async ({ where }: any) => towns.find(t => t.id === where.id) ?? null },
+    suburb: { findUnique: async ({ where }: any) => suburbs.find(x => x.id === where.id) ?? null },
     category: { findUnique: async ({ where }: any) => categories.find((c) => c.id === where.id) ?? null },
     subCategory: { findUnique: async ({ where }: any) => subCategories.find((s) => s.id === where.id) ?? null },
     serviceRequest: {
@@ -113,5 +117,58 @@ describe('ServiceRequestsService', () => {
     const questions = makeQuestionsServiceStub(false);
     const service = new ServiceRequestsService(prisma as any, questions);
     await expect(service.getById('missing', 'customer-1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  describe('job location (town / suburb)', () => {
+    const base = { categoryId: 'cat-plumbing', subCategoryId: 'sub-pipe-repair', message: 'Leaking pipe' };
+
+    it('saves a valid town and suburb on the request', async () => {
+      const prisma = makeFakePrisma();
+      const service = new ServiceRequestsService(prisma as any, makeQuestionsServiceStub(false));
+      const result = await service.create('customer-1', { ...base, townId: 't-jhb', suburbId: 's-san' });
+      expect(result.townId).toBe('t-jhb');
+      expect(result.suburbId).toBe('s-san');
+    });
+
+    it('accepts a town without a suburb (suburb is optional)', async () => {
+      const prisma = makeFakePrisma();
+      const service = new ServiceRequestsService(prisma as any, makeQuestionsServiceStub(false));
+      const result = await service.create('customer-1', { ...base, townId: 't-pta' });
+      expect(result.townId).toBe('t-pta');
+      expect(result.suburbId).toBeUndefined();
+    });
+
+    it('still accepts a request with no location at all (existing clients keep working)', async () => {
+      const prisma = makeFakePrisma();
+      const service = new ServiceRequestsService(prisma as any, makeQuestionsServiceStub(false));
+      const result = await service.create('customer-1', { ...base });
+      expect(result.status).toBe('OPEN');
+      expect(result.townId).toBeUndefined();
+    });
+
+    it('rejects an unknown town', async () => {
+      const prisma = makeFakePrisma();
+      const service = new ServiceRequestsService(prisma as any, makeQuestionsServiceStub(false));
+      await expect(service.create('customer-1', { ...base, townId: 'nope' })).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma._requests).toHaveLength(0);
+    });
+
+    it('rejects a suburb that belongs to a different town', async () => {
+      const prisma = makeFakePrisma();
+      const service = new ServiceRequestsService(prisma as any, makeQuestionsServiceStub(false));
+      await expect(service.create('customer-1', { ...base, townId: 't-pta', suburbId: 's-san' })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects an unknown suburb', async () => {
+      const prisma = makeFakePrisma();
+      const service = new ServiceRequestsService(prisma as any, makeQuestionsServiceStub(false));
+      await expect(service.create('customer-1', { ...base, townId: 't-jhb', suburbId: 'nope' })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('rejects a suburb supplied without its town', async () => {
+      const prisma = makeFakePrisma();
+      const service = new ServiceRequestsService(prisma as any, makeQuestionsServiceStub(false));
+      await expect(service.create('customer-1', { ...base, suburbId: 's-san' })).rejects.toBeInstanceOf(BadRequestException);
+    });
   });
 });

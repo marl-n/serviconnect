@@ -166,6 +166,80 @@ model SubCategory {
   @@index([categoryId])
 }
 
+// ─── South African location hierarchy (Province → Town → Suburb) ──────────
+// Sourced from GeoNames (see prisma/import-locations.ts). Independent of
+// Business.suburb/city/province/lat/lng, which remain free-text fields
+// describing a business's own physical address and drive the existing
+// lat/lng proximity search in SearchService — that is unrelated to this
+// feature and is left untouched. This hierarchy exists so customers can
+// pick a job location, and businesses can pick which towns they serve,
+// without typing a free-text address or using any map/geocoding service.
+
+model Province {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  // GeoNames admin1 code (e.g. "ZA.06") — kept for idempotent re-import,
+  // not used anywhere else.
+  geonamesCode String? @unique
+  createdAt DateTime @default(now())
+
+  towns Town[]
+}
+
+model Town {
+  id         String  @id @default(cuid())
+  provinceId String
+  name       String
+  // Nullable: a geonameId uniquely identifies the GeoNames source row, used
+  // by the import script to upsert idempotently. Towns added by hand later
+  // (not from GeoNames) simply omit it.
+  geonameId  Int?    @unique
+  lat        Float?
+  lng        Float?
+  population Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  province     Province              @relation(fields: [provinceId], references: [id])
+  suburbs      Suburb[]
+  serviceAreas BusinessServiceArea[]
+  serviceRequests ServiceRequest[]
+
+  @@unique([provinceId, name])
+  @@index([provinceId])
+}
+
+model Suburb {
+  id        String   @id @default(cuid())
+  townId    String
+  name      String
+  geonameId Int?     @unique
+  lat       Float?
+  lng       Float?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  town            Town             @relation(fields: [townId], references: [id])
+  serviceRequests ServiceRequest[]
+
+  @@unique([townId, name])
+  @@index([townId])
+}
+
+// Many-to-many: which towns a business serves. Mirrors the existing
+// BusinessSubCategory join-table pattern.
+model BusinessServiceArea {
+  businessId String
+  townId     String
+  createdAt  DateTime @default(now())
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  town     Town     @relation(fields: [townId], references: [id], onDelete: Cascade)
+
+  @@id([businessId, townId])
+  @@index([townId])
+}
+
 // Defines the dynamic per-category (or per-subcategory) question schema
 // used to build the customer-facing ServiceRequest form.
 // subCategoryId = null means the question applies to the whole category.
@@ -196,6 +270,12 @@ model ServiceRequest {
   categoryId    String
   subCategoryId String
   message       String
+  // Structured job location (new). Nullable at the DB level for safe
+  // additive migration; the create DTO requires townId for new requests.
+  // jobAddress is kept as an optional free-text supplement (e.g. unit
+  // number, complex name, landmark) — not replaced, not removed.
+  townId        String?
+  suburbId      String?
   jobAddress    String?
   jobDate       DateTime?
   budget        Int?
@@ -208,11 +288,14 @@ model ServiceRequest {
   customer    User        @relation(fields: [customerId], references: [id])
   category    Category    @relation(fields: [categoryId], references: [id])
   subCategory SubCategory @relation(fields: [subCategoryId], references: [id])
+  town        Town?       @relation(fields: [townId], references: [id])
+  suburb      Suburb?     @relation(fields: [suburbId], references: [id])
   leads       Lead[]
 
   @@index([customerId])
   @@index([categoryId, subCategoryId])
   @@index([status])
+  @@index([townId])
 }
 
 model Business {
@@ -274,6 +357,7 @@ model Business {
   gallery               BusinessGallery[]
   wallet                BusinessWallet?
   creditPurchases       CreditPurchase[]
+  serviceAreas          BusinessServiceArea[]
 
   @@index([slug])
   @@index([categoryId])

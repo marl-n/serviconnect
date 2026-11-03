@@ -12,7 +12,8 @@
     "test": "jest",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "import:locations": "ts-node prisma/import-locations.ts"
   },
   "jest": {
     "moduleFileExtensions": ["js", "json", "ts"],
