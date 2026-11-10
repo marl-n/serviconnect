@@ -2,9 +2,36 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TOKEN_KEY = 'sc_token';
+const API_PATH = '/api/v1';
+
+/**
+ * Resolves the API base URL from EXPO_PUBLIC_API_URL (set in mobile/.env, or
+ * in the EAS build environment). Accepts either the server origin
+ * ("http://192.168.0.126:3000") or the full API root
+ * ("http://192.168.0.126:3000/api/v1") — /api/v1 is appended only if missing.
+ *
+ * Expo inlines EXPO_PUBLIC_* at bundle time, so this must stay a literal
+ * `process.env.EXPO_PUBLIC_API_URL` access, and changes need a Metro restart.
+ */
+function resolveApiBaseUrl(): string {
+  const raw = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (!raw) {
+    throw new Error(
+      'EXPO_PUBLIC_API_URL is not set. Copy mobile/.env.example to mobile/.env, set it to your ' +
+        'backend (e.g. http://192.168.0.126:3000/api/v1), then restart with `npx expo start --clear`.',
+    );
+  }
+  if (!/^https?:\/\/[^/]+/i.test(raw)) {
+    throw new Error(`EXPO_PUBLIC_API_URL must be an http(s) URL, got "${raw}".`);
+  }
+  const base = raw.replace(/\/+$/, '');
+  return base.toLowerCase().endsWith(API_PATH) ? base : `${base}${API_PATH}`;
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 export const api = axios.create({
- baseURL: 'http://192.168.0.126:3000/api/v1',
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
   timeout: 10000,
 });
