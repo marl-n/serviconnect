@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, IsPositive, IsDateString, MaxLength, IsObject, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsInt, IsPositive, IsDateString, MaxLength, IsObject, IsIn } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateServiceRequestDto {
@@ -17,13 +17,13 @@ export class CreateServiceRequestDto {
   @MaxLength(2000)
   message: string;
 
-  // Structured job location (see LocationsModule). Optional for now so the
-  // existing mobile client keeps working; suburb is always optional and
-  // requires a town.
-  @ApiPropertyOptional({ description: 'Town/city where the job is located' })
-  @IsOptional()
+  // Structured job location (see LocationsModule). The town is required so
+  // every request can be matched to businesses' service areas; the suburb is
+  // always optional, descriptive only, and must belong to the town.
+  @ApiProperty({ description: 'Town/city where the job is located' })
   @IsString()
-  townId?: string;
+  @IsNotEmpty()
+  townId: string;
 
   @ApiPropertyOptional({ description: 'Suburb within the town (optional)' })
   @IsOptional()

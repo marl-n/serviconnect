@@ -52,6 +52,7 @@ describe('ServiceRequestsService', () => {
       categoryId: 'cat-plumbing',
       subCategoryId: 'sub-pipe-repair',
       message: 'Leaking pipe under the sink',
+      townId: 't-jhb',
     });
 
     expect(result.status).toBe('OPEN');
@@ -69,6 +70,7 @@ describe('ServiceRequestsService', () => {
         categoryId: 'cat-plumbing',
         subCategoryId: 'sub-wiring', // belongs to cat-OTHER
         message: 'x',
+        townId: 't-jhb',
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
@@ -79,7 +81,7 @@ describe('ServiceRequestsService', () => {
     const service = new ServiceRequestsService(prisma as any, questions);
 
     await expect(
-      service.create('customer-1', { categoryId: 'cat-missing', subCategoryId: 'sub-pipe-repair', message: 'x' }),
+      service.create('customer-1', { categoryId: 'cat-missing', subCategoryId: 'sub-pipe-repair', message: 'x', townId: 't-jhb' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -89,7 +91,7 @@ describe('ServiceRequestsService', () => {
     const service = new ServiceRequestsService(prisma as any, questions);
 
     await expect(
-      service.create('customer-1', { categoryId: 'cat-plumbing', subCategoryId: 'sub-pipe-repair', message: 'x' }),
+      service.create('customer-1', { categoryId: 'cat-plumbing', subCategoryId: 'sub-pipe-repair', message: 'x', townId: 't-jhb' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -99,7 +101,7 @@ describe('ServiceRequestsService', () => {
     const service = new ServiceRequestsService(prisma as any, questions);
 
     await expect(
-      service.create('customer-1', { categoryId: 'cat-plumbing', subCategoryId: 'sub-does-not-exist', message: 'x' }),
+      service.create('customer-1', { categoryId: 'cat-plumbing', subCategoryId: 'sub-does-not-exist', message: 'x', townId: 't-jhb' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -107,7 +109,7 @@ describe('ServiceRequestsService', () => {
     const prisma = makeFakePrisma();
     const questions = makeQuestionsServiceStub(false);
     const service = new ServiceRequestsService(prisma as any, questions);
-    const created = await service.create('customer-1', { categoryId: 'cat-plumbing', subCategoryId: 'sub-pipe-repair', message: 'x' });
+    const created = await service.create('customer-1', { categoryId: 'cat-plumbing', subCategoryId: 'sub-pipe-repair', message: 'x', townId: 't-jhb' });
 
     await expect(service.getById(created.id, 'customer-2')).rejects.toBeInstanceOf(ForbiddenException);
   });
@@ -138,12 +140,11 @@ describe('ServiceRequestsService', () => {
       expect(result.suburbId).toBeUndefined();
     });
 
-    it('still accepts a request with no location at all (existing clients keep working)', async () => {
+    it('rejects a request with no town (the town is required for matching)', async () => {
       const prisma = makeFakePrisma();
       const service = new ServiceRequestsService(prisma as any, makeQuestionsServiceStub(false));
-      const result = await service.create('customer-1', { ...base });
-      expect(result.status).toBe('OPEN');
-      expect(result.townId).toBeUndefined();
+      await expect(service.create('customer-1', { ...base } as any)).rejects.toBeInstanceOf(BadRequestException);
+      expect(prisma._requests).toHaveLength(0);
     });
 
     it('rejects an unknown town', async () => {
@@ -168,7 +169,7 @@ describe('ServiceRequestsService', () => {
     it('rejects a suburb supplied without its town', async () => {
       const prisma = makeFakePrisma();
       const service = new ServiceRequestsService(prisma as any, makeQuestionsServiceStub(false));
-      await expect(service.create('customer-1', { ...base, suburbId: 's-san' })).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.create('customer-1', { ...base, suburbId: 's-san' } as any)).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 });

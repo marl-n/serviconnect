@@ -21,7 +21,9 @@ export class LocationsService {
     });
   }
 
-  getTowns(provinceId: string, q?: string, limit?: number) {
+  async getTowns(provinceId: string, q?: string, limit?: number) {
+    const province = await this.prisma.province.findUnique({ where: { id: provinceId }, select: { id: true } });
+    if (!province) throw new NotFoundException(`Province ${provinceId} not found`);
     const search = q?.trim();
     return this.prisma.town.findMany({
       where: {
@@ -34,8 +36,10 @@ export class LocationsService {
     });
   }
 
-  /** Suburbs are optional data: a town with none simply returns an empty list. */
-  getSuburbs(townId: string) {
+  /** Suburbs are optional data: a known town with none returns an empty list; an unknown town is a 404. */
+  async getSuburbs(townId: string) {
+    const town = await this.prisma.town.findUnique({ where: { id: townId }, select: { id: true } });
+    if (!town) throw new NotFoundException(`Town ${townId} not found`);
     return this.prisma.suburb.findMany({
       where: { townId },
       orderBy: { name: 'asc' },

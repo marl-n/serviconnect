@@ -22,10 +22,9 @@ export class ServiceRequestsService {
     }
   }
 
-  /** Town must exist; suburb (optional) must exist and belong to that town. */
-  private async validateLocation(townId?: string, suburbId?: string) {
-    if (!townId && !suburbId) return;
-    if (!townId) throw new BadRequestException('A suburb can only be chosen together with its town');
+  /** Town is required and must exist; suburb (optional) must exist and belong to that town. */
+  private async validateLocation(townId: string, suburbId?: string) {
+    if (!townId) throw new BadRequestException('A town is required for every service request');
 
     const town = await this.prisma.town.findUnique({ where: { id: townId } });
     if (!town) throw new BadRequestException(`Town ${townId} not found`);
