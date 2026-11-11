@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CategoryQuestionsService } from '../category-questions/category-questions.service';
+import { MatchingService } from '../matching/matching.service';
 import { CreateServiceRequestDto, UpdateServiceRequestStatusDto } from './dto/service-request.dto';
 
 @Injectable()
@@ -8,7 +9,10 @@ export class ServiceRequestsService {
   constructor(
     private prisma: PrismaService,
     private categoryQuestions: CategoryQuestionsService,
+    @Optional() private matching?: MatchingService,
   ) {}
+
+  private readonly log = new Logger(ServiceRequestsService.name);
 
   /** Confirms subCategoryId actually belongs to categoryId — required, mirrors BusinessesService.setSubCategories. */
   private async validateCategoryPair(categoryId: string, subCategoryId: string) {
@@ -43,11 +47,7 @@ export class ServiceRequestsService {
     await this.validateLocation(dto.townId, dto.suburbId);
     await this.categoryQuestions.validateAnswers(dto.categoryId, dto.subCategoryId, dto.answers);
 
-    // NOTE: matching businesses to this request and generating Lead rows is
-    // deliberately not implemented yet — this phase only persists the
-    // request. See project notes: "sophisticated matching engine" is a
-    // later phase.
-    return this.prisma.serviceRequest.create({
+    const request = await this.prisma.serviceRequest.create({
       data: {
         customerId,
         categoryId: dto.categoryId,
@@ -59,9 +59,20 @@ export class ServiceRequestsService {
         jobDate: dto.jobDate ? new Date(dto.jobDate) : undefined,
         budget: dto.budget,
         answers: dto.answers as any,
+        photos: dto.photos ?? [],
         status: 'OPEN',
       },
     });
+
+    // Create one locked Lead per eligible business. A matching failure must not
+    // lose the customer's request: it is logged, and the request stays OPEN.
+    let matchedBusinesses = 0;
+    try {
+      matchedBusinesses = (await this.matching?.matchRequest(request.id)) ?? 0;
+    } catch (err) {
+      this.log.error(`Matching failed for request ${request.id}`, err as any);
+    }
+    return { ...request, status: matchedBusinesses > 0 ? 'MATCHED' : request.status, matchedBusinesses };
   }
 
   async getMine(customerId: string) {

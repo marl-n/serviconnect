@@ -4,3 +4,5 @@ dist/
 .expo/
 *.log
 .pnpm-store/
+# Locally stored uploads (MVP image storage)
+backend/uploads/

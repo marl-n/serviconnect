@@ -5,6 +5,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { CreditsService } from '../credits/credits.service';
+
+/** Free credits a new business gets so it can try the marketplace (env WELCOME_CREDITS; 0 disables). */
+const welcomeCredits = () => {
+  const n = Number(process.env.WELCOME_CREDITS ?? 30);
+  return Number.isInteger(n) && n >= 0 ? n : 30;
+};
 import {
   CreateBusinessDto,
   UpdateBusinessDto,
@@ -35,7 +42,7 @@ const PUBLIC_INCLUDE = {
 
 @Injectable()
 export class BusinessesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, private credits: CreditsService) {}
 
   // ─── Public ────────────────────────────────────────────────────────────────
 
@@ -115,7 +122,7 @@ export class BusinessesService {
     const existing = await this.prisma.business.findUnique({ where: { userId } });
     if (existing) return existing;
     const slug = this.toSlug(dto.name) + '-' + Date.now().toString(36);
-    return this.prisma.business.create({
+    const business = await this.prisma.business.create({
       data: {
         userId,
         slug,
@@ -136,6 +143,16 @@ export class BusinessesService {
         yearsInBusiness: dto.yearsInBusiness,
       },
     });
+    if (welcomeCredits() > 0) {
+      await this.credits.grantCredits({
+        businessId: business.id,
+        amount: welcomeCredits(),
+        type: 'PROMOTIONAL',
+        reason: 'Welcome credits',
+        idempotencyKey: `welcome:${business.id}`,
+      });
+    }
+    return business;
   }
 
   async update(businessId: string, userId: string, dto: UpdateBusinessDto) {

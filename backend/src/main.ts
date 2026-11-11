@@ -1,10 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
+import { UPLOADS_DIR } from './uploads/uploads.constants';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.useStaticAssets(UPLOADS_DIR, { prefix: '/uploads/' });
   app.setGlobalPrefix('api/v1');
   app.enableCors({
     origin: [process.env.FRONTEND_URL, 'http://localhost:3001', 'http://localhost:19006'],

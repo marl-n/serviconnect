@@ -7,6 +7,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 
+/** At most this many businesses may unlock leads from one service request. */
+export const MAX_UNLOCKS_PER_REQUEST = 3;
+
 @Injectable()
 export class CreditsService {
   constructor(private prisma: PrismaService) {}
@@ -85,6 +88,21 @@ export class CreditsService {
       const creditCost = lead.creditCost ?? 0;
       if (creditCost <= 0) {
         throw new BadRequestException('Lead has no valid credit cost configured');
+      }
+
+      if (lead.expiresAt && lead.expiresAt < new Date()) {
+        throw new BadRequestException('This lead has expired');
+      }
+
+      // Claim one of the request's unlock slots. Conditional increment in one
+      // statement, so concurrent unlocks by different businesses can't exceed
+      // the cap; rolled back with everything else if a later step fails.
+      const slot = await tx.serviceRequest.updateMany({
+        where: { id: lead.serviceRequestId, unlockCount: { lt: MAX_UNLOCKS_PER_REQUEST }, status: { in: ['OPEN', 'MATCHED'] } },
+        data: { unlockCount: { increment: 1 } },
+      });
+      if (slot.count === 0) {
+        throw new ConflictException(`This job is no longer available — it has been unlocked by ${MAX_UNLOCKS_PER_REQUEST} businesses or closed`);
       }
 
       const wallet = await this.getOrCreateWalletTx(tx, businessId);

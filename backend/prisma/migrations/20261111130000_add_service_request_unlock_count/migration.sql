@@ -1,0 +1,1 @@
+ALTER TABLE "ServiceRequest" ADD COLUMN "unlockCount" INTEGER NOT NULL DEFAULT 0;

@@ -280,6 +280,8 @@ model ServiceRequest {
   jobDate       DateTime?
   budget        Int?
   answers       Json?
+  photos        String[]             @default([]) // URLs from POST /uploads/images
+  unlockCount   Int                  @default(0)  // businesses that unlocked a lead from this request (max 3)
   status        ServiceRequestStatus @default(OPEN)
   expiresAt     DateTime?
   createdAt     DateTime             @default(now())

@@ -6,6 +6,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { BusinessesService } from './businesses.service';
 import { LocationsService } from '../locations/locations.service';
+import { MatchingService } from '../matching/matching.service';
 import { SetServiceAreasDto } from '../locations/dto/locations.dto';
 import {
   CreateBusinessDto,
@@ -25,7 +26,13 @@ export class BusinessesController {
   constructor(
     private biz: BusinessesService,
     private locations: LocationsService,
+    private matching: MatchingService,
   ) {}
+
+  /** Matching is a follow-up: a failure must not fail the save the business just made. */
+  private async matchQuietly(businessId: string) {
+    await this.matching.matchBusiness(businessId).catch(err => console.error('matchBusiness failed', businessId, err));
+  }
 
   // ─── Public ─────────────────────────────────────────────────────────────────
 
@@ -121,12 +128,14 @@ export class BusinessesController {
   @Post(':id/subcategories')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Set sub-categories for a business (replaces existing)' })
-  setSubCategories(
+  async setSubCategories(
     @Param('id') id: string,
     @CurrentUser() user: any,
     @Body() dto: SetSubCategoriesDto,
   ) {
-    return this.biz.setSubCategories(id, user.sub, dto);
+    const result = await this.biz.setSubCategories(id, user.sub, dto);
+    await this.matchQuietly(id); // pick up recent open requests it now qualifies for
+    return result;
   }
 
   // ─── Service areas (towns a business serves) ─────────────────────────────────
@@ -143,12 +152,14 @@ export class BusinessesController {
   @Post(':id/service-areas')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Set the towns a business serves (replaces existing)' })
-  setServiceAreas(
+  async setServiceAreas(
     @Param('id') id: string,
     @CurrentUser() user: any,
     @Body() dto: SetServiceAreasDto,
   ) {
-    return this.locations.setBusinessServiceAreas(id, user.sub, dto.townIds);
+    const result = await this.locations.setBusinessServiceAreas(id, user.sub, dto.townIds);
+    await this.matchQuietly(id);
+    return result;
   }
 
   // ─── Gallery — owner ─────────────────────────────────────────────────────────

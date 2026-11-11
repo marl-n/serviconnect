@@ -19,6 +19,7 @@ function makeFakePrisma() {
   const transactions: any[] = [];
   const leads: any[] = [];
   const purchases: any[] = [];
+  const requests: Record<string, any> = {};
   let idCounter = 0;
   const nextId = (prefix: string) => `${prefix}_${++idCounter}`;
 
@@ -112,6 +113,18 @@ function makeFakePrisma() {
           return { ...row };
         },
       },
+      serviceRequest: {
+        // Requests referenced by seeded leads exist implicitly (OPEN, no unlocks yet).
+        updateMany: async ({ where, data }: any) => {
+          const row = (requests[where.id] ??= { id: where.id, unlockCount: 0, status: 'OPEN' });
+          if (where.unlockCount?.lt !== undefined && !(row.unlockCount < where.unlockCount.lt)) return { count: 0 };
+          if (where.status?.in && !where.status.in.includes(row.status)) return { count: 0 };
+          const prev = row.unlockCount;
+          row.unlockCount += data.unlockCount?.increment ?? 0;
+          undoLog.push(() => (row.unlockCount = prev));
+          return { count: 1 };
+        },
+      },
       creditPurchase: {
         findUnique: async ({ where }: any) => purchases.find((p) => p.id === where.id) ?? null,
         update: async ({ where, data }: any) => {
@@ -153,6 +166,8 @@ function makeFakePrisma() {
     getWallets: () => wallets,
     getTransactions: () => transactions,
     getLeads: () => leads,
+    getRequests: () => requests,
+    seedRequest: (r: any) => (requests[r.id] = { unlockCount: 0, status: 'OPEN', ...r }),
   };
 }
 
@@ -292,6 +307,52 @@ describe('CreditsService', () => {
       expect(fake.getTransactions().filter((t) => t.type === 'LEAD_UNLOCK')).toHaveLength(1);
       expect(fake.getWallets()[0].balance).toBe(0);
       expect(fake.getWallets()[0].balance).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('unlockLead — max 3 businesses per request', () => {
+    const seedFive = () => {
+      for (let i = 1; i <= 5; i++) {
+        fake.seedWallet(`biz-${i}`, 100);
+        fake.seedLead({ id: `lead-${i}`, businessId: `biz-${i}`, serviceRequestId: 'sr-1', creditCost: 10 });
+      }
+    };
+
+    it('lets the first three businesses unlock and rejects the fourth without charging it', async () => {
+      seedFive();
+      for (let i = 1; i <= 3; i++) await service.unlockLead({ leadId: `lead-${i}`, businessId: `biz-${i}` });
+      await expect(service.unlockLead({ leadId: 'lead-4', businessId: 'biz-4' })).rejects.toBeInstanceOf(ConflictException);
+      expect(fake.getWallets().find(w => w.businessId === 'biz-4')!.balance).toBe(100);
+      expect(fake.getLeads().find(l => l.id === 'lead-4')!.isUnlocked).toBe(false);
+      expect(fake.getRequests()['sr-1'].unlockCount).toBe(3);
+    });
+
+    it('never exceeds three under concurrent unlocks', async () => {
+      seedFive();
+      const results = await Promise.allSettled([1, 2, 3, 4, 5].map(i => service.unlockLead({ leadId: `lead-${i}`, businessId: `biz-${i}` })));
+      expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(3);
+      expect(fake.getLeads().filter(l => l.isUnlocked)).toHaveLength(3);
+      expect(fake.getTransactions()).toHaveLength(3);
+    });
+
+    it('does not use up a slot when the unlock fails for lack of credits', async () => {
+      seedFive();
+      fake.getWallets().find(w => w.businessId === 'biz-1')!.balance = 0;
+      await expect(service.unlockLead({ leadId: 'lead-1', businessId: 'biz-1' })).rejects.toBeInstanceOf(ConflictException);
+      expect(fake.getRequests()['sr-1'].unlockCount).toBe(0);
+    });
+
+    it('rejects unlocking a lead from a cancelled request', async () => {
+      seedFive();
+      fake.seedRequest({ id: 'sr-1', status: 'CANCELLED' });
+      await expect(service.unlockLead({ leadId: 'lead-1', businessId: 'biz-1' })).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('re-unlocking an already-unlocked lead does not use a second slot', async () => {
+      seedFive();
+      await service.unlockLead({ leadId: 'lead-1', businessId: 'biz-1' });
+      await service.unlockLead({ leadId: 'lead-1', businessId: 'biz-1' });
+      expect(fake.getRequests()['sr-1'].unlockCount).toBe(1);
     });
   });
 

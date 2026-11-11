@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsInt, IsPositive, IsDateString, MaxLength, IsObject, IsIn } from 'class-validator';
+import { IsArray, ArrayMaxSize, Matches, IsString, IsNotEmpty, IsOptional, IsInt, IsPositive, IsDateString, MaxLength, IsObject, IsIn } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateServiceRequestDto {
@@ -46,6 +46,14 @@ export class CreateServiceRequestDto {
   @IsInt()
   @IsPositive()
   budget?: number;
+
+  @ApiPropertyOptional({ type: [String], description: 'Photo URLs returned by POST /uploads/images (max 5)' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  @Matches(/^\/uploads\/[A-Za-z0-9._-]+$/, { each: true, message: 'photos must be URLs returned by /uploads/images' })
+  photos?: string[];
 
   @ApiPropertyOptional({ description: 'Category-specific answers keyed by CategoryQuestion.key' })
   @IsOptional()
