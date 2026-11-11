@@ -22,9 +22,15 @@
  * 3. Import (refused while the plan has blocking issues):
  *      npm run import:locations
  *
- * The dataset is curated, not exhaustive: municipal seats, places with population ≥ 5,000,
- * one selectable city per metro, and the reviewed decisions in <dir>/overrides.json
- * (see the rules on buildImportPlan in src/locations/geonames.ts).
+ * The dataset is curated, not exhaustive: municipal seats, places with population ≥ 5,000
+ * (≥ 20,000 in the village-dominated municipalities listed in overrides.json), one selectable city
+ * per metro (all eight metros except Ekurhuleni, which stays as separate towns), and the documented
+ * decisions in <dir>/overrides.json — province corrections, towns, suburbs, exclusions and renames
+ * (see the rules on buildImportPlan in src/locations/geonames.ts). Suburbs are optional descriptors
+ * under a town; they are never required and play no part in lead matching.
+ *
+ * The report (--report) contains the totals, per-province counts, metro classifications, every
+ * manual override, every province → town → suburb, excluded places and remaining warnings.
  *
  * Options:
  *   --dir <folder>             where ZA.txt + admin1CodesASCII.txt live (default prisma/data/geonames)
@@ -52,6 +58,7 @@ import {
   DEFAULT_OPTIONS,
   GeonamesPlace,
   ImportPlan,
+  Curation,
 } from '../src/locations/geonames';
 
 const CHUNK = 1000;
@@ -253,7 +260,7 @@ async function loadHierarchy(file: string, wantedChildIds: Set<number>): Promise
   return edges;
 }
 
-function printReport(plan: ImportPlan, hierarchyNote: string) {
+function printReport(plan: ImportPlan, curation: Curation, hierarchyNote: string) {
   const st = plan.stats;
   const n = (v: number) => v.toLocaleString('en-ZA');
   const kv = (o: Record<string, number>) => Object.entries(o).map(([k, v]) => `${k}=${n(v)}`).join(', ') || 'none';
@@ -276,9 +283,13 @@ function printReport(plan: ImportPlan, hierarchyNote: string) {
   if (st.suburbDistanceKm) console.log(`  distance to parent: median ${st.suburbDistanceKm.median} km, p90 ${st.suburbDistanceKm.p90} km, max ${st.suburbDistanceKm.max} km`);
   console.log(`  towns with no suburbs: ${n(st.townsWithoutSuburbs)} of ${n(st.towns)} (suburbs are optional)`);
 
-  const byCity = new Map<string, number>();
-  for (const m of plan.metroAbsorbed) byCity.set(m.city, (byCity.get(m.city) ?? 0) + 1);
-  console.log(`\nTown-sized places absorbed into a metro city: ${[...byCity].map(([c, k]) => `${c}=${k}`).join(', ') || 'none'}`);
+  console.log('\nMetros (one selectable city each; independent towns inside the metro listed after it)');
+  for (const m of metroSummary(plan, curation)) {
+    console.log(`  ${m.code.padEnd(4)} ${m.city} — ${n(m.suburbs)} suburbs, ${m.absorbed.length} town-sized places absorbed` +
+      (m.independentTowns.length ? `; independent: ${m.independentTowns.map(t => t.name).join(', ')}` : ''));
+  }
+  const ek = plan.towns.filter(t => curation.urbanDistricts.includes(t.admin2));
+  if (ek.length) console.log(`  Urban districts kept as separate towns (${curation.urbanDistricts.join(', ')}): ${ek.map(t => t.name).sort().join(', ')}`);
 
   console.log('\nFlagged for review (full list via --report)');
   const byKind = new Map<string, ImportPlan['suspicious']>();
@@ -293,14 +304,40 @@ function printReport(plan: ImportPlan, hierarchyNote: string) {
   for (const b of plan.blocking) console.log(`  x ${b}`);
 }
 
-/** Full review report: every province → town (with the rule that admitted it) → suburbs, plus all flags. */
-function writeReport(file: string, plan: ImportPlan, meta: Record<string, unknown>) {
+/** Per metro: the selectable city, places absorbed into it, and the independent towns inside the metro. */
+function metroSummary(plan: ImportPlan, curation: Curation) {
+  const suburbCount = new Map<number, number>();
+  for (const s of plan.suburbs) suburbCount.set(s.townGeonameId, (suburbCount.get(s.townGeonameId) ?? 0) + 1);
+  return Object.entries(curation.metros)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([code, ref]) => {
+      const city = plan.towns.find(t => t.geonameId === ref.geonameId);
+      return {
+        code,
+        city: city?.name ?? ref.name,
+        geonameId: ref.geonameId,
+        suburbs: suburbCount.get(ref.geonameId) ?? 0,
+        absorbed: plan.metroAbsorbed.filter(m => m.metro === code).map(m => ({ name: m.name, geonameId: m.geonameId, km: m.km, how: m.how })),
+        independentTowns: plan.towns
+          .filter(t => t.admin2 === code && t.geonameId !== ref.geonameId)
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(t => ({ name: t.name, geonameId: t.geonameId, rule: t.source, suburbs: suburbCount.get(t.geonameId) ?? 0 })),
+      };
+    });
+}
+
+/**
+ * Full review report: totals, per-province counts, metro classifications, every manual override,
+ * every province → town (with the rule that admitted it) → suburbs, excluded places and remaining warnings.
+ */
+function writeReport(file: string, plan: ImportPlan, curation: Curation, meta: Record<string, unknown>) {
   const suburbsByTown = new Map<number, string[]>();
   for (const s of plan.suburbs) {
     const list = suburbsByTown.get(s.townGeonameId) ?? [];
     list.push(s.name);
     suburbsByTown.set(s.townGeonameId, list);
   }
+  const provinceName = new Map(plan.provinces.map(p => [p.geonamesCode, p.name]));
   const provinces = plan.provinces.map(p => ({
     name: p.name,
     geonamesCode: p.geonamesCode,
@@ -314,9 +351,24 @@ function writeReport(file: string, plan: ImportPlan, meta: Record<string, unknow
         featureCode: t.featureCode,
         population: t.population,
         district: t.admin2,
+        municipality: t.admin3 ?? '',
+        lat: t.lat,
+        lng: t.lng,
         suburbs: (suburbsByTown.get(t.geonameId) ?? []).sort((a, b) => a.localeCompare(b)),
       })),
   }));
+
+  // Unpopulated farm/locality points below the threshold are only counted — there are ~10,000 of them.
+  const listed = plan.excluded.filter(e => !(e.reason === 'below-threshold' && e.population === 0));
+  const excluded = {
+    countsByReason: plan.stats.excludedByReason,
+    note: 'Every excluded populated place is listed except unpopulated (population 0) places below the town threshold, which are only counted.',
+    places: listed.map(e => ({ ...e, province: provinceName.get(e.provinceCode) ?? e.provinceCode })),
+  };
+
+  const warnings: Record<string, ImportPlan['suspicious']> = {};
+  for (const r of plan.suspicious) (warnings[r.kind] ??= []).push(r);
+
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(
     file,
@@ -324,11 +376,30 @@ function writeReport(file: string, plan: ImportPlan, meta: Record<string, unknow
       {
         generatedAt: new Date().toISOString(),
         ...meta,
-        stats: plan.stats,
+        summary: {
+          provinces: plan.provinces.length,
+          towns: plan.stats.towns,
+          suburbs: plan.stats.suburbs,
+          perProvince: plan.provinces.map(p => ({ province: p.name, towns: plan.stats.townsPerProvince[p.name], suburbs: plan.stats.suburbsPerProvince[p.name] })),
+          townsByRule: plan.stats.townsBySource,
+          suburbsBySource: plan.stats.suburbsBySource,
+          excludedByReason: plan.stats.excludedByReason,
+        },
         blocking: plan.blocking,
-        metroAbsorbed: plan.metroAbsorbed,
-        flagged: plan.suspicious,
+        metros: metroSummary(plan, curation),
+        urbanDistrictTowns: plan.towns.filter(t => curation.urbanDistricts.includes(t.admin2)).map(t => t.name).sort(),
+        manualOverrides: {
+          ruralMunicipalities: curation.ruralMunicipalities,
+          reassign: curation.reassign,
+          towns: curation.towns,
+          suburbs: curation.suburbs,
+          exclude: curation.exclude,
+          rename: curation.rename,
+        },
+        warnings: { counts: Object.fromEntries(Object.entries(warnings).map(([k, v]) => [k, v.length])), ...warnings },
+        stats: plan.stats,
         provinces,
+        excluded,
       },
       null,
       2,
@@ -381,10 +452,10 @@ async function main() {
   const options = { minTownPopulation: args.minTownPopulation, maxSuburbKm: args.maxSuburbKm };
   const plan = buildImportPlan(places, admin1, options, hierarchy, curation);
 
-  printReport(plan, hierarchyNote);
+  printReport(plan, curation, hierarchyNote);
 
   if (args.reportFile) {
-    writeReport(args.reportFile, plan, {
+    writeReport(args.reportFile, plan, curation, {
       options: { ...DEFAULT_OPTIONS, ...options },
       hierarchy: hierarchyNote,
       overrides: path.basename(overridesFile),

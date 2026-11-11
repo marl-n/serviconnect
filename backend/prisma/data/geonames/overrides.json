@@ -1,96 +1,1471 @@
 {
-  "version": 1,
-  "notes": "Reviewed curation decisions for the South African location dataset. Every entry names a GeoNames row by geonameId and its GeoNames name (checked on import). Rules these override are documented on buildImportPlan in src/locations/geonames.ts.",
+  "version": 2,
+  "notes": "Curation decisions for the South African location dataset (Province -> City/Town -> optional Suburb). Every entry names a GeoNames row by geonameId AND its GeoNames name (checked on import) and carries a reason. Rules these override are documented on buildImportPlan in src/locations/geonames.ts. Sources: GeoNames ZA dump; Municipal Demarcation Board municipal structure (8 metros); Government Gazette No. 39669 (9 Feb 2016: Komani, Cacadu, KwaBhaca, Khowa, Maxesibeni); 2021 gazetted renames (Gqeberha, Kariega, Qonce, Nqanqarhu, Winnie Mandela); Census 2001 sub-place tables (Redhill, Glenmore). Where no authoritative source was found the reason says 'uncertain'.",
   "metros": {
-    "JHB": { "geonameId": 993800, "name": "Johannesburg", "reason": "City of Johannesburg metro: one selectable city" },
-    "TSH": { "geonameId": 964137, "name": "Pretoria", "reason": "City of Tshwane metro: one selectable city" },
-    "CPT": { "geonameId": 3369157, "name": "Cape Town", "reason": "City of Cape Town metro: one selectable city" },
-    "ETH": { "geonameId": 1007311, "name": "Durban", "reason": "eThekwini metro: one selectable city" },
-    "NMA": { "geonameId": 964420, "name": "Gqeberha", "reason": "Nelson Mandela Bay metro: one selectable city" },
-    "MAN": { "geonameId": 1018725, "name": "Bloemfontein", "reason": "Mangaung metro: one selectable city" }
+    "JHB": {
+      "geonameId": 993800,
+      "name": "Johannesburg",
+      "reason": "City of Johannesburg metro: one selectable city"
+    },
+    "TSH": {
+      "geonameId": 964137,
+      "name": "Pretoria",
+      "reason": "City of Tshwane metro: one selectable city"
+    },
+    "CPT": {
+      "geonameId": 3369157,
+      "name": "Cape Town",
+      "reason": "City of Cape Town metro: one selectable city"
+    },
+    "ETH": {
+      "geonameId": 1007311,
+      "name": "Durban",
+      "reason": "eThekwini metro: one selectable city"
+    },
+    "NMA": {
+      "geonameId": 964420,
+      "name": "Gqeberha",
+      "reason": "Nelson Mandela Bay metro: one selectable city"
+    },
+    "MAN": {
+      "geonameId": 1018725,
+      "name": "Bloemfontein",
+      "reason": "Mangaung metro: one selectable city"
+    },
+    "BUF": {
+      "geonameId": 1006984,
+      "name": "East London",
+      "reason": "Buffalo City is one of South Africa's eight metropolitan municipalities (metro since 2011) and East London is its seat: one selectable city. Qonce and Bhisho stay separate towns (50 km inland)"
+    }
   },
-  "urbanDistricts": ["EKU"],
+  "urbanDistricts": [
+    "EKU"
+  ],
+  "ruralMunicipalities": {
+    "minPopulation": 20000,
+    "notes": "Local municipalities dominated by villages (mostly former homeland areas). GeoNames lists their census villages as populated places with populations above 5,000, which would add hundreds of villages as 'towns'. Here a non-seat place needs 20,000 people; real commercial towns below that are kept explicitly under 'towns'. Codes are GeoNames admin3 (municipal) codes.",
+    "codes": [
+      "EC121",
+      "EC122",
+      "EC126",
+      "EC134",
+      "EC135",
+      "EC136",
+      "EC137",
+      "EC138",
+      "EC141",
+      "EC153",
+      "EC154",
+      "EC155",
+      "EC156",
+      "EC157",
+      "EC441",
+      "EC442",
+      "EC443",
+      "EC444",
+      "KZN233",
+      "KZN242",
+      "KZN244",
+      "KZN265",
+      "KZN266",
+      "KZN271",
+      "KZN272",
+      "KZN275",
+      "KZN286",
+      "KZN293",
+      "KZN294",
+      "KZN435",
+      "LIM331",
+      "LIM332",
+      "LIM333",
+      "LIM342",
+      "LIM343",
+      "LIM344",
+      "LIM351",
+      "LIM352",
+      "LIM353",
+      "LIM354",
+      "LIM355",
+      "LIM367",
+      "LIM471",
+      "LIM472",
+      "LIM473",
+      "LIM474",
+      "LIM475",
+      "MP301",
+      "MP303",
+      "MP315",
+      "MP316",
+      "MP324",
+      "MP325",
+      "NW371",
+      "NW373",
+      "NW375",
+      "NW383",
+      "NW384",
+      "NW385",
+      "NW394",
+      "NW397"
+    ]
+  },
+  "reassign": [
+    {
+      "geonameId": 998082,
+      "name": "Hammanskraal",
+      "province": "06",
+      "district": "TSH",
+      "municipality": "TSH",
+      "reason": "Part of City of Tshwane (Gauteng) since 2011; GeoNames still codes it North West"
+    },
+    {
+      "geonameId": 1002851,
+      "name": "Ga-Rankuwa",
+      "province": "06",
+      "district": "TSH",
+      "municipality": "TSH",
+      "reason": "Part of City of Tshwane (Gauteng); GeoNames still codes it North West"
+    },
+    {
+      "geonameId": 1004109,
+      "name": "Fochville",
+      "province": "06",
+      "district": "DC48",
+      "municipality": "GT484",
+      "reason": "Merafong City moved to Gauteng (West Rand) in 2009; GeoNames still codes it North West"
+    },
+    {
+      "geonameId": 994023,
+      "name": "Jan Kempdorp",
+      "province": "08",
+      "district": "DC9",
+      "municipality": "NC094",
+      "reason": "Phokwane municipality, Northern Cape; GeoNames codes it North West"
+    },
+    {
+      "geonameId": 1105727,
+      "name": "Kwamhlanga",
+      "province": "07",
+      "district": "DC31",
+      "municipality": "MP315",
+      "reason": "Seat of Thembisile Hani municipality, Mpumalanga; GeoNames codes it Gauteng"
+    },
+    {
+      "geonameId": 944380,
+      "name": "Verena",
+      "province": "07",
+      "district": "DC31",
+      "municipality": "MP315",
+      "reason": "Thembisile Hani municipality, Mpumalanga; GeoNames codes it Gauteng"
+    },
+    {
+      "geonameId": 974738,
+      "name": "Moloto South",
+      "district": "DC31",
+      "municipality": "MP315",
+      "reason": "Thembisile Hani municipality, Mpumalanga; GeoNames has no district code"
+    },
+    {
+      "geonameId": 1023713,
+      "name": "Acornhoek",
+      "province": "07",
+      "district": "DC32",
+      "municipality": "MP325",
+      "reason": "Bushbuckridge municipality moved to Mpumalanga in 2006; GeoNames still codes it Limpopo"
+    },
+    {
+      "geonameId": 1007140,
+      "name": "Dwarsloop",
+      "province": "07",
+      "district": "DC32",
+      "municipality": "MP325",
+      "reason": "Bushbuckridge municipality, Mpumalanga since 2006; GeoNames codes it Limpopo"
+    },
+    {
+      "geonameId": 996236,
+      "name": "Hluvukani",
+      "province": "07",
+      "district": "DC32",
+      "municipality": "MP325",
+      "reason": "Bushbuckridge municipality, Mpumalanga since 2006; GeoNames codes it Limpopo"
+    },
+    {
+      "geonameId": 993507,
+      "name": "Justicia",
+      "province": "07",
+      "district": "DC32",
+      "municipality": "MP325",
+      "reason": "Bushbuckridge municipality, Mpumalanga since 2006; GeoNames codes it Limpopo"
+    },
+    {
+      "geonameId": 982806,
+      "name": "Lillydale",
+      "province": "07",
+      "district": "DC32",
+      "municipality": "MP325",
+      "reason": "Bushbuckridge municipality, Mpumalanga since 2006; GeoNames codes it Limpopo"
+    },
+    {
+      "geonameId": 981517,
+      "name": "Ludlow",
+      "province": "07",
+      "district": "DC32",
+      "municipality": "MP325",
+      "reason": "Bushbuckridge municipality, Mpumalanga since 2006; GeoNames codes it Limpopo"
+    },
+    {
+      "geonameId": 940524,
+      "name": "Welverdiend",
+      "province": "07",
+      "district": "DC32",
+      "municipality": "MP325",
+      "reason": "Bushbuckridge municipality, Mpumalanga since 2006; GeoNames codes it Limpopo"
+    },
+    {
+      "geonameId": 1014650,
+      "name": "Burgersfort",
+      "province": "09",
+      "district": "DC47",
+      "municipality": "LIM475",
+      "reason": "Seat of Fetakgomo Tubatse, Sekhukhune district, Limpopo since 2006; GeoNames still codes it Mpumalanga"
+    },
+    {
+      "geonameId": 999964,
+      "name": "Groblersdal",
+      "province": "09",
+      "district": "DC47",
+      "municipality": "LIM472",
+      "reason": "Seat of Elias Motsoaledi, Sekhukhune district, Limpopo since 2006; GeoNames still codes it Mpumalanga"
+    },
+    {
+      "geonameId": 978944,
+      "name": "Marble Hall",
+      "province": "09",
+      "district": "DC47",
+      "municipality": "LIM471",
+      "reason": "Seat of Ephraim Mogale, Sekhukhune district, Limpopo since 2006; GeoNames still codes it Mpumalanga"
+    },
+    {
+      "geonameId": 973676,
+      "name": "Motetema",
+      "province": "09",
+      "district": "DC47",
+      "municipality": "LIM472",
+      "reason": "Elias Motsoaledi municipality, Limpopo; GeoNames codes it Mpumalanga"
+    },
+    {
+      "geonameId": 978327,
+      "name": "Matatiele",
+      "province": "05",
+      "district": "DC44",
+      "municipality": "EC441",
+      "reason": "Matatiele municipality moved to the Eastern Cape in 2006; GeoNames still codes it KwaZulu-Natal"
+    },
+    {
+      "geonameId": 1013835,
+      "name": "Cedarville",
+      "province": "05",
+      "district": "DC44",
+      "municipality": "EC441",
+      "reason": "Matatiele municipality, Eastern Cape since 2006; GeoNames codes it KwaZulu-Natal"
+    },
+    {
+      "geonameId": 946016,
+      "name": "Umzimkulu",
+      "province": "02",
+      "district": "DC43",
+      "municipality": "KZN435",
+      "reason": "Umzimkhulu municipality moved to KwaZulu-Natal in 2006; GeoNames still codes it Eastern Cape"
+    },
+    {
+      "geonameId": 1013199,
+      "name": "Clydesdale",
+      "province": "02",
+      "district": "DC43",
+      "municipality": "KZN435",
+      "reason": "Beside Umzimkhulu town, KwaZulu-Natal since 2006; GeoNames codes it Eastern Cape"
+    },
+    {
+      "geonameId": 948542,
+      "name": "Tokoza",
+      "district": "EKU",
+      "municipality": "EKU",
+      "reason": "Thokoza township is in Ekurhuleni (beside Alberton/Katlehong), not Midvaal as GeoNames codes it"
+    },
+    {
+      "geonameId": 958725,
+      "name": "Rustenburg North",
+      "province": "10",
+      "district": "DC37",
+      "municipality": "NW373",
+      "reason": "Suburb of Rustenburg (1.1 km from the town centre) carrying a Limpopo province code and no district"
+    },
+    {
+      "geonameId": 11204536,
+      "name": "Soshanguve South",
+      "province": "06",
+      "district": "TSH",
+      "municipality": "TSH",
+      "reason": "Part of Soshanguve, City of Tshwane (Gauteng); GeoNames codes it Madibeng, North West"
+    },
+    {
+      "geonameId": 11204935,
+      "name": "Lenasia Ext 2",
+      "district": "JHB",
+      "municipality": "JHB",
+      "reason": "Part of Lenasia, City of Johannesburg; GeoNames codes it Westonaria (West Rand)"
+    }
+  ],
   "towns": [
-    { "geonameId": 991415, "name": "Kempton Park", "reason": "Ekurhuleni commercial town; GeoNames population is 0" },
-    { "geonameId": 1020590, "name": "Bedfordview", "reason": "Ekurhuleni commercial town; GeoNames population is 0" },
-    { "geonameId": 952865, "name": "Springs", "reason": "Ekurhuleni town (pop 186k) stored by GeoNames as a section of a place (PPLX)" },
-    { "geonameId": 946877, "name": "Kariega", "reason": "Approved: independent town within Nelson Mandela Bay" },
-    { "geonameId": 1016670, "name": "Botshabelo", "reason": "Approved: independent town within Mangaung" },
-    { "geonameId": 949703, "name": "Thaba Nchu", "reason": "Approved: independent town within Mangaung" },
-    { "geonameId": 1000352, "name": "Graskop", "reason": "Established Panorama Route tourism town; population 4,788 just under threshold" },
-    { "geonameId": 945995, "name": "Underberg", "reason": "Southern Drakensberg regional service town; population 3,227" },
-    { "geonameId": 8063467, "name": "St Francis Bay", "reason": "Established holiday town (Kouga) stored by GeoNames as a section of a place (PPLX)" },
-    { "geonameId": 991353, "name": "Kenton", "reason": "Kenton-on-Sea, established holiday town stored by GeoNames as a section of a place (PPLX)" },
-    { "geonameId": 1010717, "name": "Despatch", "reason": "PENDING CONFIRMATION: separate town in Nelson Mandela Bay adjoining Kariega (approved independent), 23 km from Gqeberha" },
-    { "geonameId": 948468, "name": "Tongaat", "reason": "PENDING CONFIRMATION: separate North Coast town in eThekwini, 33 km from Durban" },
-    { "geonameId": 946128, "name": "eMkhomazi", "reason": "PENDING CONFIRMATION: separate South Coast town (Umkomaas) in eThekwini, 45 km from Durban" },
-    { "geonameId": 1013886, "name": "Cato Ridge", "reason": "PENDING CONFIRMATION: separate inland town in eThekwini, 45 km from Durban" },
-    { "geonameId": 3370352, "name": "Atlantis", "reason": "PENDING CONFIRMATION: separate town in City of Cape Town, 40 km from the city, outside the continuous urban area" },
-    { "geonameId": 1015504, "name": "Bronkhorstspruit", "reason": "PENDING CONFIRMATION: separate town in Tshwane, 56 km from Pretoria" },
-    { "geonameId": 1012413, "name": "Cullinan", "reason": "PENDING CONFIRMATION: separate town in Tshwane, 35 km from Pretoria" }
+    {
+      "geonameId": 991415,
+      "name": "Kempton Park",
+      "reason": "Ekurhuleni commercial town; GeoNames population is 0"
+    },
+    {
+      "geonameId": 1020590,
+      "name": "Bedfordview",
+      "reason": "Ekurhuleni commercial town; GeoNames population is 0"
+    },
+    {
+      "geonameId": 952865,
+      "name": "Springs",
+      "reason": "Ekurhuleni town (pop 186k) stored by GeoNames as a section of a place (PPLX)"
+    },
+    {
+      "geonameId": 946877,
+      "name": "Kariega",
+      "reason": "Approved: independent town within Nelson Mandela Bay (city of ~290k); 10 km catchment covers KwaNobuhle",
+      "catchmentKm": 10
+    },
+    {
+      "geonameId": 1016670,
+      "name": "Botshabelo",
+      "reason": "Approved: independent town within Mangaung",
+      "catchmentKm": 20
+    },
+    {
+      "geonameId": 949703,
+      "name": "Thaba Nchu",
+      "reason": "Approved: independent town within Mangaung",
+      "catchmentKm": 20
+    },
+    {
+      "geonameId": 1010717,
+      "name": "Despatch",
+      "reason": "Confirmed: separate town in Nelson Mandela Bay with its own centre, adjoining Kariega (also independent), 23 km from Gqeberha"
+    },
+    {
+      "geonameId": 948468,
+      "name": "Tongaat",
+      "reason": "Confirmed: established North Coast town in eThekwini, 33 km from Durban, outside the continuous urban area"
+    },
+    {
+      "geonameId": 946128,
+      "name": "eMkhomazi",
+      "reason": "Confirmed: South Coast town (Umkomaas) in eThekwini, 45 km from Durban",
+      "catchmentKm": 8
+    },
+    {
+      "geonameId": 1013886,
+      "name": "Cato Ridge",
+      "reason": "Confirmed: separate inland industrial town in eThekwini, 45 km from Durban"
+    },
+    {
+      "geonameId": 3370352,
+      "name": "Atlantis",
+      "reason": "Confirmed: separate industrial town in City of Cape Town, 40 km from the city, outside the continuous urban area",
+      "catchmentKm": 10
+    },
+    {
+      "geonameId": 1015504,
+      "name": "Bronkhorstspruit",
+      "reason": "Confirmed: separate town in Tshwane (former Kungwini seat), 56 km from Pretoria",
+      "catchmentKm": 20
+    },
+    {
+      "geonameId": 1012413,
+      "name": "Cullinan",
+      "reason": "Confirmed: separate mining/heritage town in Tshwane, 35 km from Pretoria",
+      "catchmentKm": 10
+    },
+    {
+      "geonameId": 998082,
+      "name": "Hammanskraal",
+      "reason": "Separate town in Tshwane 40 km north of Pretoria with its own centre (consistent with Cullinan); unlike Soshanguve/Mabopane it is not part of the continuous urban area",
+      "catchmentKm": 10
+    },
+    {
+      "geonameId": 990849,
+      "name": "Qonce",
+      "reason": "Established town (formerly King William's Town) in Buffalo City, 50 km from East London",
+      "catchmentKm": 25
+    },
+    {
+      "geonameId": 1019330,
+      "name": "Bhisho",
+      "catchmentKm": 25,
+      "reason": "Provincial capital and municipal seat in Buffalo City, 50 km inland from East London; listed here only to give it a 25 km suburb catchment"
+    },
+    {
+      "geonameId": 1000352,
+      "name": "Graskop",
+      "reason": "Established Panorama Route tourism town; population 4,788 just under threshold"
+    },
+    {
+      "geonameId": 945995,
+      "name": "Underberg",
+      "reason": "Southern Drakensberg regional service town; population 3,227"
+    },
+    {
+      "geonameId": 8063467,
+      "name": "St Francis Bay",
+      "reason": "Established holiday town (Kouga) stored by GeoNames as a section of a place (PPLX)"
+    },
+    {
+      "geonameId": 991353,
+      "name": "Kenton",
+      "reason": "Kenton-on-Sea, established holiday town stored by GeoNames as a section of a place (PPLX)"
+    },
+    {
+      "geonameId": 994978,
+      "name": "Dutywa",
+      "reason": "Seat of Mbhashe municipality and regional commercial town (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 1005470,
+      "name": "Ngcobo",
+      "reason": "Engcobo town, seat of Engcobo municipality (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 946932,
+      "name": "Ugie",
+      "reason": "Established timber town in Elundini (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 1008858,
+      "name": "Dordrecht",
+      "reason": "Established town in Emalahleni (EC) (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 994804,
+      "name": "Indwe",
+      "reason": "Established town in Emalahleni (EC) (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 1005781,
+      "name": "Khowa",
+      "reason": "Established town (formerly Elliot) in Sakhisizwe (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 981294,
+      "name": "Lusikisiki",
+      "reason": "Main commercial town of Ngquza Hill (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 964408,
+      "name": "Port Saint John’s",
+      "reason": "Seat of Port St Johns municipality and tourism town (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 947739,
+      "name": "Tsolo",
+      "reason": "Commercial town in Mhlontlo on the R396 (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 950468,
+      "name": "Ntabankulu",
+      "reason": "Seat of Ntabankulu municipality; GeoNames does not mark it as a seat"
+    },
+    {
+      "geonameId": 1013835,
+      "name": "Cedarville",
+      "reason": "Established farming town in Matatiele (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 946016,
+      "name": "Umzimkulu",
+      "reason": "Seat of Umzimkhulu municipality; GeoNames has no population or seat code for it"
+    },
+    {
+      "geonameId": 969454,
+      "name": "Nqutu",
+      "reason": "Seat of Nquthu municipality (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 979405,
+      "name": "Manguzi",
+      "reason": "Main commercial town of Umhlabuyalingana (KwaNgwanase) (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 958273,
+      "name": "Saint Lucia",
+      "reason": "Established tourism town (iSimangaliso); population 1,322"
+    },
+    {
+      "geonameId": 11282157,
+      "name": "Malamulele",
+      "reason": "Seat of Collins Chabane municipality (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 1018148,
+      "name": "Bochum",
+      "reason": "Senwabarwana, seat of Blouberg municipality (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 998279,
+      "name": "Haenertsburg",
+      "reason": "Established Magoebaskloof tourism village; GeoNames population is 0"
+    },
+    {
+      "geonameId": 13527156,
+      "name": "Thulamahashe",
+      "reason": "Main commercial centre of eastern Bushbuckridge (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 1017354,
+      "name": "Bosbokrand",
+      "reason": "Bushbuckridge town, seat of Bushbuckridge municipality; GeoNames does not mark it as a seat"
+    },
+    {
+      "geonameId": 979837,
+      "name": "Malelane",
+      "reason": "Seat of Nkomazi municipality and N4 commercial town; population 4,176"
+    },
+    {
+      "geonameId": 1105727,
+      "name": "Kwamhlanga",
+      "reason": "Seat of Thembisile Hani municipality (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 1021770,
+      "name": "eManzana",
+      "reason": "Badplaas, established resort town in Chief Albert Luthuli (rural-municipality rule would drop it)"
+    },
+    {
+      "geonameId": 965179,
+      "name": "Pilgrim's Rest",
+      "reason": "Heritage and tourism town; population 2,061"
+    },
+    {
+      "geonameId": 968442,
+      "name": "Ogies",
+      "reason": "Mining and commercial town in eMalahleni; population 4,265"
+    },
+    {
+      "geonameId": 7289237,
+      "name": "Marloth Park",
+      "reason": "Established holiday town beside the Kruger Park; population 1,198"
+    },
+    {
+      "geonameId": 991491,
+      "name": "Keimoes",
+      "reason": "Established Orange River town in Kai !Garib; GeoNames population is 0"
+    },
+    {
+      "geonameId": 997972,
+      "name": "Hanover",
+      "reason": "Established N1 town in Emthanjeni; GeoNames population is 0 (its population is under Oakglen)"
+    },
+    {
+      "geonameId": 951271,
+      "name": "Sutherland",
+      "reason": "Established Karoo town (SALT observatory); GeoNames population is 0"
+    },
+    {
+      "geonameId": 3363003,
+      "name": "Paternoster",
+      "reason": "Established West Coast holiday town; population 2,360"
+    },
+    {
+      "geonameId": 3358975,
+      "name": "Yzerfontein",
+      "reason": "Established West Coast holiday town; population 1,365"
+    },
+    {
+      "geonameId": 3367442,
+      "name": "Greyton",
+      "reason": "Established Overberg town; population 3,329"
+    },
+    {
+      "geonameId": 3364246,
+      "name": "McGregor",
+      "reason": "Established Breede Valley town; population 3,744"
+    },
+    {
+      "geonameId": 1020992,
+      "name": "Barrydale",
+      "reason": "Established Route 62 town; population 4,979 just under threshold"
+    },
+    {
+      "geonameId": 3362555,
+      "name": "Rawsonville",
+      "reason": "Established Breede Valley wine town; population 3,712"
+    },
+    {
+      "geonameId": 3370086,
+      "name": "Betty's Bay",
+      "reason": "Established Overberg holiday town; population 1,653"
+    },
+    {
+      "geonameId": 996060,
+      "name": "Hogsback",
+      "reason": "Established Amathole mountain tourism town; population 1,232"
+    },
+    {
+      "geonameId": 972787,
+      "name": "Mtunzini",
+      "reason": "Established North Coast town; population 2,635"
+    },
+    {
+      "geonameId": 6692734,
+      "name": "Pennington",
+      "reason": "Established South Coast holiday town; population 3,337"
+    },
+    {
+      "geonameId": 996643,
+      "name": "Hibberdene",
+      "reason": "Established South Coast holiday town; population 2,280"
+    },
+    {
+      "geonameId": 969619,
+      "name": "Nottingham Road",
+      "reason": "Established Midlands Meander town; population 1,530"
+    }
   ],
   "suburbs": [
-    { "geonameId": 954013, "name": "Soshanguve", "parentGeonameId": 964137, "parentName": "Pretoria", "reason": "Approved: suburb of Pretoria" },
-    { "geonameId": 6951112, "name": "Somerset West", "parentGeonameId": 3369157, "parentName": "Cape Town", "reason": "Approved: suburb of Cape Town" },
-    { "geonameId": 11204106, "name": "Etwatwa", "parentGeonameId": 1020098, "parentName": "Benoni", "reason": "Township, part of Benoni/Daveyton; not a separate commercial town" },
-    { "geonameId": 8030233, "name": "Midstream", "parentGeonameId": 991415, "parentName": "Kempton Park", "reason": "Residential estate, not a town" },
-
-    { "geonameId": 963241, "name": "Randburg", "parentGeonameId": 993800, "parentName": "Johannesburg", "reason": "Metro: part of City of Johannesburg (12.8 km)" },
-    { "geonameId": 936374, "name": "Roodepoort", "parentGeonameId": 993800, "parentName": "Johannesburg", "reason": "Metro: part of City of Johannesburg (17.6 km)" },
-    { "geonameId": 953781, "name": "Soweto", "parentGeonameId": 993800, "parentName": "Johannesburg", "reason": "Metro: part of City of Johannesburg (19.9 km)" },
-    { "geonameId": 1105776, "name": "Midrand", "parentGeonameId": 993800, "parentName": "Johannesburg", "reason": "Metro: part of City of Johannesburg (26.2 km)" },
-    { "geonameId": 11287980, "name": "Poortje", "parentGeonameId": 993800, "parentName": "Johannesburg", "reason": "Metro: Orange Farm area, City of Johannesburg (39.7 km); not a separate commercial town" },
-
-    { "geonameId": 1105777, "name": "Centurion", "parentGeonameId": 964137, "parentName": "Pretoria", "reason": "Metro: part of City of Tshwane (12.7 km)" },
-    { "geonameId": 980921, "name": "Mabopane", "parentGeonameId": 964137, "parentName": "Pretoria", "reason": "Metro: township in City of Tshwane (29 km), consistent with Soshanguve" },
-    { "geonameId": 1105726, "name": "Ekangala", "parentGeonameId": 1015504, "parentName": "Bronkhorstspruit", "reason": "Township served from Bronkhorstspruit (15.9 km)" },
-    { "geonameId": 12718767, "name": "Rethabiseng", "parentGeonameId": 1015504, "parentName": "Bronkhorstspruit", "reason": "Township of Bronkhorstspruit (10 km)" },
-
-    { "geonameId": 3369056, "name": "Constantia", "parentGeonameId": 3369157, "parentName": "Cape Town", "reason": "Metro: part of City of Cape Town (11.7 km)" },
-    { "geonameId": 8604596, "name": "Retreat", "parentGeonameId": 3369157, "parentName": "Cape Town", "reason": "Metro: part of City of Cape Town (15.2 km)" },
-    { "geonameId": 3363882, "name": "Muizenberg", "parentGeonameId": 3369157, "parentName": "Cape Town", "reason": "Metro: part of City of Cape Town (19.7 km)" },
-    { "geonameId": 3364208, "name": "Melkbosstrand", "parentGeonameId": 3369157, "parentName": "Cape Town", "reason": "Metro: part of City of Cape Town (22.3 km)" },
-    { "geonameId": 3368254, "name": "Durbanville", "parentGeonameId": 3369157, "parentName": "Cape Town", "reason": "Metro: part of City of Cape Town (23.3 km)" },
-    { "geonameId": 3364937, "name": "Kuils River", "parentGeonameId": 3369157, "parentName": "Cape Town", "reason": "Metro: part of City of Cape Town (26.2 km)" },
-    { "geonameId": 3365083, "name": "Kraaifontein", "parentGeonameId": 3369157, "parentName": "Cape Town", "reason": "Metro: part of City of Cape Town (28.5 km)" },
-    { "geonameId": 3361618, "name": "Simon's Town", "parentGeonameId": 3369157, "parentName": "Cape Town", "reason": "Metro: part of City of Cape Town (29.8 km)" },
-    { "geonameId": 12718867, "name": "Fisantekraal", "parentGeonameId": 3369157, "parentName": "Cape Town", "reason": "Metro: settlement beside Durbanville, City of Cape Town (31.1 km)" },
-    { "geonameId": 3364343, "name": "Mamre", "parentGeonameId": 3370352, "parentName": "Atlantis", "reason": "Village beside Atlantis (6.1 km)" },
-
-    { "geonameId": 965154, "name": "Pinetown", "parentGeonameId": 1007311, "parentName": "Durban", "reason": "Metro: part of eThekwini (14.4 km)" },
-    { "geonameId": 11205667, "name": "Ntuzuma", "parentGeonameId": 1007311, "parentName": "Durban", "reason": "Metro: township in eThekwini (15.3 km)" },
-    { "geonameId": 1022953, "name": "eManzimtoti", "parentGeonameId": 1007311, "parentName": "Durban", "reason": "Metro: Amanzimtoti, part of eThekwini (25.7 km)" },
-    { "geonameId": 994860, "name": "Inanda", "parentGeonameId": 1007311, "parentName": "Durban", "reason": "Metro: township in eThekwini (28.8 km)" },
-    { "geonameId": 12718786, "name": "Hazelmere", "parentGeonameId": 1007311, "parentName": "Durban", "reason": "Metro: part of eThekwini (29.1 km)" },
-    { "geonameId": 973111, "name": "Mpumalanga", "parentGeonameId": 1007311, "parentName": "Durban", "reason": "Metro: Mpumalanga township (Hammarsdale), eThekwini (38.2 km); not a separate commercial town" },
-    { "geonameId": 980579, "name": "Magabeni", "parentGeonameId": 946128, "parentName": "eMkhomazi", "reason": "Settlement beside eMkhomazi (4.8 km)" },
-    { "geonameId": 12718788, "name": "Craigieburn", "parentGeonameId": 946128, "parentName": "eMkhomazi", "reason": "Settlement beside eMkhomazi (4.4 km)" },
-
-    { "geonameId": 11205248, "name": "Motherwell", "parentGeonameId": 964420, "parentName": "Gqeberha", "reason": "Metro: township in Nelson Mandela Bay (18.7 km)" },
-    { "geonameId": 12420903, "name": "Khaya Mnandi", "parentGeonameId": 1010717, "parentName": "Despatch", "reason": "Township of Despatch (2.9 km)" },
-
-    { "geonameId": 11428880, "name": "Lebohang", "parentGeonameId": 983065, "parentName": "Leslie", "reason": "Township of Leslie (1.4 km)" },
-    { "geonameId": 1014306, "name": "Calcutta", "parentGeonameId": 11204552, "parentName": "Mkhuhlu", "reason": "Adjoins Mkhuhlu (0.6 km)" }
+    {
+      "geonameId": 954013,
+      "name": "Soshanguve",
+      "parentGeonameId": 964137,
+      "parentName": "Pretoria",
+      "reason": "Approved: suburb of Pretoria"
+    },
+    {
+      "geonameId": 6951112,
+      "name": "Somerset West",
+      "parentGeonameId": 3369157,
+      "parentName": "Cape Town",
+      "reason": "Approved: suburb of Cape Town"
+    },
+    {
+      "geonameId": 11204106,
+      "name": "Etwatwa",
+      "parentGeonameId": 1020098,
+      "parentName": "Benoni",
+      "reason": "Township, part of Benoni/Daveyton; not a separate commercial town"
+    },
+    {
+      "geonameId": 8030233,
+      "name": "Midstream",
+      "parentGeonameId": 991415,
+      "parentName": "Kempton Park",
+      "reason": "Residential estate, not a town"
+    },
+    {
+      "geonameId": 948542,
+      "name": "Tokoza",
+      "parentGeonameId": 1023441,
+      "parentName": "Alberton",
+      "reason": "Thokoza township of Alberton (Ekurhuleni), 10 km; not a separate commercial town"
+    },
+    {
+      "geonameId": 963241,
+      "name": "Randburg",
+      "parentGeonameId": 993800,
+      "parentName": "Johannesburg",
+      "reason": "Metro: part of City of Johannesburg (12.8 km)"
+    },
+    {
+      "geonameId": 936374,
+      "name": "Roodepoort",
+      "parentGeonameId": 993800,
+      "parentName": "Johannesburg",
+      "reason": "Metro: part of City of Johannesburg (17.6 km)"
+    },
+    {
+      "geonameId": 953781,
+      "name": "Soweto",
+      "parentGeonameId": 993800,
+      "parentName": "Johannesburg",
+      "reason": "Metro: part of City of Johannesburg (19.9 km)"
+    },
+    {
+      "geonameId": 1105776,
+      "name": "Midrand",
+      "parentGeonameId": 993800,
+      "parentName": "Johannesburg",
+      "reason": "Metro: part of City of Johannesburg (26.2 km)"
+    },
+    {
+      "geonameId": 11287980,
+      "name": "Poortje",
+      "parentGeonameId": 993800,
+      "parentName": "Johannesburg",
+      "reason": "Metro: Orange Farm area, City of Johannesburg (39.7 km); not a separate commercial town"
+    },
+    {
+      "geonameId": 1105777,
+      "name": "Centurion",
+      "parentGeonameId": 964137,
+      "parentName": "Pretoria",
+      "reason": "Metro: part of City of Tshwane (12.7 km)"
+    },
+    {
+      "geonameId": 980921,
+      "name": "Mabopane",
+      "parentGeonameId": 964137,
+      "parentName": "Pretoria",
+      "reason": "Metro: township in City of Tshwane (29 km), consistent with Soshanguve"
+    },
+    {
+      "geonameId": 1002851,
+      "name": "Ga-Rankuwa",
+      "parentGeonameId": 964137,
+      "parentName": "Pretoria",
+      "reason": "Metro: township in City of Tshwane beside Mabopane, consistent with Soshanguve"
+    },
+    {
+      "geonameId": 1105726,
+      "name": "Ekangala",
+      "parentGeonameId": 1015504,
+      "parentName": "Bronkhorstspruit",
+      "reason": "Township served from Bronkhorstspruit (15.9 km)"
+    },
+    {
+      "geonameId": 12718767,
+      "name": "Rethabiseng",
+      "parentGeonameId": 1015504,
+      "parentName": "Bronkhorstspruit",
+      "reason": "Township of Bronkhorstspruit (10 km)"
+    },
+    {
+      "geonameId": 3369056,
+      "name": "Constantia",
+      "parentGeonameId": 3369157,
+      "parentName": "Cape Town",
+      "reason": "Metro: part of City of Cape Town (11.7 km)"
+    },
+    {
+      "geonameId": 8604596,
+      "name": "Retreat",
+      "parentGeonameId": 3369157,
+      "parentName": "Cape Town",
+      "reason": "Metro: part of City of Cape Town (15.2 km)"
+    },
+    {
+      "geonameId": 3363882,
+      "name": "Muizenberg",
+      "parentGeonameId": 3369157,
+      "parentName": "Cape Town",
+      "reason": "Metro: part of City of Cape Town (19.7 km)"
+    },
+    {
+      "geonameId": 3364208,
+      "name": "Melkbosstrand",
+      "parentGeonameId": 3369157,
+      "parentName": "Cape Town",
+      "reason": "Metro: part of City of Cape Town (22.3 km)"
+    },
+    {
+      "geonameId": 3368254,
+      "name": "Durbanville",
+      "parentGeonameId": 3369157,
+      "parentName": "Cape Town",
+      "reason": "Metro: part of City of Cape Town (23.3 km)"
+    },
+    {
+      "geonameId": 3364937,
+      "name": "Kuils River",
+      "parentGeonameId": 3369157,
+      "parentName": "Cape Town",
+      "reason": "Metro: part of City of Cape Town (26.2 km)"
+    },
+    {
+      "geonameId": 3365083,
+      "name": "Kraaifontein",
+      "parentGeonameId": 3369157,
+      "parentName": "Cape Town",
+      "reason": "Metro: part of City of Cape Town (28.5 km)"
+    },
+    {
+      "geonameId": 3361618,
+      "name": "Simon's Town",
+      "parentGeonameId": 3369157,
+      "parentName": "Cape Town",
+      "reason": "Metro: part of City of Cape Town (29.8 km)"
+    },
+    {
+      "geonameId": 12718867,
+      "name": "Fisantekraal",
+      "parentGeonameId": 3369157,
+      "parentName": "Cape Town",
+      "reason": "Metro: settlement beside Durbanville, City of Cape Town (31.1 km)"
+    },
+    {
+      "geonameId": 3364343,
+      "name": "Mamre",
+      "parentGeonameId": 3370352,
+      "parentName": "Atlantis",
+      "reason": "Village beside Atlantis (6.1 km)"
+    },
+    {
+      "geonameId": 965154,
+      "name": "Pinetown",
+      "parentGeonameId": 1007311,
+      "parentName": "Durban",
+      "reason": "Metro: part of eThekwini (14.4 km)"
+    },
+    {
+      "geonameId": 11205667,
+      "name": "Ntuzuma",
+      "parentGeonameId": 1007311,
+      "parentName": "Durban",
+      "reason": "Metro: township in eThekwini (15.3 km)"
+    },
+    {
+      "geonameId": 1022953,
+      "name": "eManzimtoti",
+      "parentGeonameId": 1007311,
+      "parentName": "Durban",
+      "reason": "Metro: Amanzimtoti, part of eThekwini (25.7 km)"
+    },
+    {
+      "geonameId": 994860,
+      "name": "Inanda",
+      "parentGeonameId": 1007311,
+      "parentName": "Durban",
+      "reason": "Metro: township in eThekwini (28.8 km)"
+    },
+    {
+      "geonameId": 12718786,
+      "name": "Hazelmere",
+      "parentGeonameId": 1007311,
+      "parentName": "Durban",
+      "reason": "Metro: part of eThekwini (29.1 km)"
+    },
+    {
+      "geonameId": 973111,
+      "name": "Mpumalanga",
+      "parentGeonameId": 1007311,
+      "parentName": "Durban",
+      "reason": "Metro: Mpumalanga township (Hammarsdale), eThekwini (38.2 km); not a separate commercial town"
+    },
+    {
+      "geonameId": 980579,
+      "name": "Magabeni",
+      "parentGeonameId": 946128,
+      "parentName": "eMkhomazi",
+      "reason": "Settlement beside eMkhomazi (4.8 km)"
+    },
+    {
+      "geonameId": 12718788,
+      "name": "Craigieburn",
+      "parentGeonameId": 946128,
+      "parentName": "eMkhomazi",
+      "reason": "Settlement beside eMkhomazi (4.4 km)"
+    },
+    {
+      "geonameId": 11205248,
+      "name": "Motherwell",
+      "parentGeonameId": 964420,
+      "parentName": "Gqeberha",
+      "reason": "Metro: township in Nelson Mandela Bay (18.7 km)"
+    },
+    {
+      "geonameId": 12420903,
+      "name": "Khaya Mnandi",
+      "parentGeonameId": 1010717,
+      "parentName": "Despatch",
+      "reason": "Township of Despatch (2.9 km)"
+    },
+    {
+      "geonameId": 977432,
+      "name": "Mdantsane",
+      "parentGeonameId": 1006984,
+      "parentName": "East London",
+      "reason": "Metro: township of East London in Buffalo City (14 km), part of the continuous urban area"
+    },
+    {
+      "geonameId": 1000937,
+      "name": "Gonubie",
+      "parentGeonameId": 1006984,
+      "parentName": "East London",
+      "reason": "Metro: coastal suburb of East London (10 km)"
+    },
+    {
+      "geonameId": 1009863,
+      "name": "Dimbaza",
+      "parentGeonameId": 990849,
+      "parentName": "Qonce",
+      "reason": "Buffalo City township served from Qonce (17 km); not a separate commercial town"
+    },
+    {
+      "geonameId": 12718751,
+      "name": "Phakamisa",
+      "parentGeonameId": 990849,
+      "parentName": "Qonce",
+      "reason": "Buffalo City township beside Zwelitsha/Qonce (7 km)"
+    },
+    {
+      "geonameId": 12718754,
+      "name": "Ndevana",
+      "parentGeonameId": 1019330,
+      "parentName": "Bhisho",
+      "reason": "Buffalo City township near Bhisho (9 km)"
+    },
+    {
+      "geonameId": 12718752,
+      "name": "Ilitha",
+      "parentGeonameId": 1019330,
+      "parentName": "Bhisho",
+      "reason": "Buffalo City township near Bhisho (10 km)"
+    },
+    {
+      "geonameId": 986717,
+      "name": "Kruisfontein",
+      "parentGeonameId": 995094,
+      "parentName": "Humansdorp",
+      "reason": "Township of Humansdorp (4.5 km)"
+    },
+    {
+      "geonameId": 12718753,
+      "name": "Nomathamasanqa",
+      "parentGeonameId": 1023672,
+      "parentName": "Addo",
+      "reason": "Township of Addo (3.4 km)"
+    },
+    {
+      "geonameId": 1017565,
+      "name": "Bontrug",
+      "parentGeonameId": 990802,
+      "parentName": "Kirkwood",
+      "reason": "Township of Kirkwood (3.7 km)"
+    },
+    {
+      "geonameId": 963525,
+      "name": "Queensdale",
+      "parentGeonameId": 963516,
+      "parentName": "Queenstown",
+      "reason": "Township of Komani (10 km)"
+    },
+    {
+      "geonameId": 1013199,
+      "name": "Clydesdale",
+      "parentGeonameId": 946016,
+      "parentName": "Umzimkulu",
+      "reason": "Adjoins Umzimkhulu town (4 km)"
+    },
+    {
+      "geonameId": 986083,
+      "name": "Kutloanong",
+      "parentGeonameId": 968477,
+      "parentName": "Odendaalsrus",
+      "reason": "Township of Odendaalsrus (7.4 km)"
+    },
+    {
+      "geonameId": 12718757,
+      "name": "Phomolong",
+      "parentGeonameId": 996918,
+      "parentName": "Hennenman",
+      "reason": "Township of Hennenman (7 km)"
+    },
+    {
+      "geonameId": 12718756,
+      "name": "Tshiame",
+      "parentGeonameId": 997751,
+      "parentName": "Harrismith",
+      "reason": "Township of Harrismith (15 km)"
+    },
+    {
+      "geonameId": 1001642,
+      "name": "Glenharvie",
+      "parentGeonameId": 940316,
+      "parentName": "Westonaria",
+      "reason": "Mining township served from Westonaria (8.5 km)"
+    },
+    {
+      "geonameId": 11204214,
+      "name": "Ga-Malakhe",
+      "parentGeonameId": 964406,
+      "parentName": "Port Shepstone",
+      "reason": "Gamalakhe township of Port Shepstone"
+    },
+    {
+      "geonameId": 973139,
+      "name": "Mpophomeni",
+      "parentGeonameId": 995202,
+      "parentName": "Howick",
+      "reason": "Township of Howick (10.9 km)"
+    },
+    {
+      "geonameId": 982891,
+      "name": "Lidgetton",
+      "parentGeonameId": 995202,
+      "parentName": "Howick",
+      "reason": "Midlands village served from Howick"
+    },
+    {
+      "geonameId": 996419,
+      "name": "Hilton",
+      "parentGeonameId": 965301,
+      "parentName": "Pietermaritzburg",
+      "reason": "Residential suburb on the edge of Pietermaritzburg (9 km)"
+    },
+    {
+      "geonameId": 951441,
+      "name": "Sundumbili",
+      "parentGeonameId": 8063456,
+      "parentName": "Mandeni",
+      "reason": "Township of Mandeni (2.2 km)"
+    },
+    {
+      "geonameId": 11205753,
+      "name": "Ncotshane",
+      "parentGeonameId": 964574,
+      "parentName": "Pongola",
+      "reason": "Township of Pongola (5.6 km)"
+    },
+    {
+      "geonameId": 11204578,
+      "name": "Trust Feed",
+      "parentGeonameId": 941923,
+      "parentName": "Wartburg",
+      "reason": "Rural settlement served from Wartburg (4.8 km)"
+    },
+    {
+      "geonameId": 940509,
+      "name": "Wembesi",
+      "parentGeonameId": 1004962,
+      "parentName": "Estcourt",
+      "reason": "Settlement served from Estcourt (9.1 km)"
+    },
+    {
+      "geonameId": 972147,
+      "name": "Namakgale",
+      "parentGeonameId": 965528,
+      "parentName": "Phalaborwa",
+      "reason": "Township of Phalaborwa (11 km)"
+    },
+    {
+      "geonameId": 12718834,
+      "name": "Thubelihle",
+      "parentGeonameId": 987202,
+      "parentName": "Kriel",
+      "reason": "Township of Kriel (5 km)"
+    },
+    {
+      "geonameId": 1005646,
+      "name": "eMbalenhle",
+      "parentGeonameId": 956767,
+      "parentName": "Secunda",
+      "reason": "Township of Secunda (8 km)"
+    },
+    {
+      "geonameId": 12718835,
+      "name": "Tekwane",
+      "parentGeonameId": 971534,
+      "parentName": "Mbombela",
+      "reason": "Township of Mbombela (17 km), beside KaNyamazane"
+    },
+    {
+      "geonameId": 13527189,
+      "name": "Mafemani",
+      "parentGeonameId": 1007140,
+      "parentName": "Dwarsloop",
+      "reason": "Village area adjoining Dwarsloop (2.5 km), Bushbuckridge; not a separate commercial town"
+    },
+    {
+      "geonameId": 12750584,
+      "name": "Nhlazatje",
+      "parentGeonameId": 11204240,
+      "parentName": "Lukwatini",
+      "reason": "Settlement adjoining Elukwatini (3.4 km), Chief Albert Luthuli; not a separate commercial town"
+    },
+    {
+      "geonameId": 11428880,
+      "name": "Lebohang",
+      "parentGeonameId": 983065,
+      "parentName": "Leslie",
+      "reason": "Township of Leslie (1.4 km)"
+    },
+    {
+      "geonameId": 1014306,
+      "name": "Calcutta",
+      "parentGeonameId": 11204552,
+      "parentName": "Mkhuhlu",
+      "reason": "Adjoins Mkhuhlu (0.6 km)"
+    },
+    {
+      "geonameId": 12718844,
+      "name": "Umzimhle",
+      "parentGeonameId": 967476,
+      "parentName": "Orkney",
+      "reason": "Township of Orkney (7.6 km)"
+    },
+    {
+      "geonameId": 12718856,
+      "name": "Nuwerus NC",
+      "parentGeonameId": 945945,
+      "parentName": "Upington",
+      "reason": "Residential area of Upington (3.3 km)"
+    },
+    {
+      "geonameId": 966380,
+      "name": "Pampierstad",
+      "parentGeonameId": 997373,
+      "parentName": "Hartswater",
+      "reason": "Township served from Hartswater (11 km)"
+    },
+    {
+      "geonameId": 12718855,
+      "name": "Oakglen",
+      "parentGeonameId": 997972,
+      "parentName": "Hanover",
+      "reason": "Township of Hanover (1 km)"
+    },
+    {
+      "geonameId": 3368033,
+      "name": "eNduli",
+      "parentGeonameId": 3369129,
+      "parentName": "Ceres",
+      "reason": "Township of Ceres (3.1 km)"
+    },
+    {
+      "geonameId": 12718868,
+      "name": "Le Roux",
+      "parentGeonameId": 3367877,
+      "parentName": "Franschhoek",
+      "reason": "Residential area of Franschhoek (2.7 km)"
+    },
+    {
+      "geonameId": 3364872,
+      "name": "Kylemore",
+      "parentGeonameId": 3361025,
+      "parentName": "Stellenbosch",
+      "reason": "Village in the Banhoek valley served from Stellenbosch (8 km)"
+    },
+    {
+      "geonameId": 12718865,
+      "name": "Languedoc",
+      "parentGeonameId": 3361025,
+      "parentName": "Stellenbosch",
+      "reason": "Village beside Pniel served from Stellenbosch (7 km)"
+    },
+    {
+      "geonameId": 12718866,
+      "name": "Kranshoek",
+      "parentGeonameId": 964712,
+      "parentName": "Plettenberg Bay",
+      "reason": "Settlement served from Plettenberg Bay (9 km)"
+    },
+    {
+      "geonameId": 997431,
+      "name": "Hartenbos",
+      "parentGeonameId": 973709,
+      "parentName": "Mossel Bay",
+      "reason": "Coastal suburb of Mossel Bay (6 km)"
+    }
   ],
   "exclude": [
-    { "geonameId": 12746698, "name": "Westville", "reason": "Spurious municipal-seat row in Nelson Mandela Bay with no population; the real Westville is a Durban suburb" },
-    { "geonameId": 974932, "name": "Mogwase", "reason": "Duplicate seat row with no population, 11 km from the populated Mogwase (974933) that is kept" },
-    { "geonameId": 13665309, "name": "Ekhephini", "reason": "Duplicate of Barkly East (1021046), 0.3 km apart, no population" },
-    { "geonameId": 1016671, "name": "Botshabelo", "reason": "Duplicate row with no population beside the Botshabelo town (1016670)" },
-    { "geonameId": 7576313, "name": "Bela-Bela", "reason": "Duplicate seat row with no population; the populated Bela Bela (941966) is kept and renamed" },
-    { "geonameId": 975509, "name": "eMkhuze", "reason": "Same town as Mkuze (975511, district seat), 0.7 km apart" },
-    { "geonameId": 13665080, "name": "Cacadu", "reason": "Duplicate seat row with no population for Lady Frere (985011), 0.1 km apart" },
-    { "geonameId": 949026, "name": "Thulamahashi", "reason": "Same place as Thulamahashe (13527156, Mpumalanga), 1.3 km apart, wrong province code (Limpopo)" },
-    { "geonameId": 976922, "name": "Merry Pebble Stream", "reason": "Village 1.8 km from Kumana (Mpumalanga) carrying a wrong province code (Limpopo)" }
+    {
+      "geonameId": 12746698,
+      "name": "Westville",
+      "reason": "Spurious municipal-seat row in Nelson Mandela Bay with no population; the real Westville is a Durban suburb"
+    },
+    {
+      "geonameId": 974933,
+      "name": "Mogwase",
+      "reason": "Duplicate of the Mogwase seat row (974932, Moses Kotane municipal seat) 11 km away; the seat row is kept"
+    },
+    {
+      "geonameId": 13665309,
+      "name": "Ekhephini",
+      "reason": "Duplicate of Barkly East (1021046), 0.3 km apart, no population"
+    },
+    {
+      "geonameId": 1016671,
+      "name": "Botshabelo",
+      "reason": "Duplicate row with no population beside the Botshabelo town (1016670)"
+    },
+    {
+      "geonameId": 7576313,
+      "name": "Bela-Bela",
+      "reason": "Duplicate seat row with no population; the populated Bela Bela (941966) is kept and renamed"
+    },
+    {
+      "geonameId": 975509,
+      "name": "eMkhuze",
+      "reason": "Same town as Mkuze (975511, district seat), 0.7 km apart"
+    },
+    {
+      "geonameId": 13665080,
+      "name": "Cacadu",
+      "reason": "Duplicate seat row with no population for Lady Frere (985011), 0.1 km apart; 985011 is kept and named Cacadu (Lady Frere)"
+    },
+    {
+      "geonameId": 949026,
+      "name": "Thulamahashi",
+      "reason": "Same place as Thulamahashe (13527156, Mpumalanga), 1.3 km apart, wrong province code (Limpopo)"
+    },
+    {
+      "geonameId": 976922,
+      "name": "Merry Pebble Stream",
+      "reason": "Village 1.8 km from Kumana (Mpumalanga) carrying a wrong province code (Limpopo)"
+    },
+    {
+      "geonameId": 12718837,
+      "name": "Redhill",
+      "reason": "Rural sub-place of Chief Albert Luthuli (Census 2001: 2,588 people) beside Glenmore, 1.9 km apart; GeoNames population of 23,153 is implausible; not a town"
+    },
+    {
+      "geonameId": 8604906,
+      "name": "Hartbeestfontein-A",
+      "reason": "Rural village cluster in Rustenburg municipality, not a town; name would be confused with the town Hartbeesfontein (Matlosana)"
+    },
+    {
+      "geonameId": 12718845,
+      "name": "Carousel View",
+      "reason": "Casino resort development, not a town"
+    },
+    {
+      "geonameId": 12718789,
+      "name": "Frischgewaagd",
+      "reason": "Rural settlement in eDumbe, not a commercial town (uncertain: no authoritative description found)"
+    },
+    {
+      "geonameId": 995469,
+      "name": "Hopewell",
+      "reason": "Rural settlement in Richmond municipality, not a commercial town (uncertain: no authoritative description found)"
+    },
+    {
+      "geonameId": 12718768,
+      "name": "Bagale",
+      "reason": "Unidentified settlement in Mogale City with no matching town; not imported (uncertain)"
+    },
+    {
+      "geonameId": 1005924,
+      "name": "Eldoraigne",
+      "reason": "Misplaced suburb point coded Free State at Free State coordinates; the real Eldoraigne (1005925, Centurion, Tshwane) is imported as a suburb of Pretoria"
+    },
+    {
+      "geonameId": 962331,
+      "name": "Richmond",
+      "reason": "Unpopulated Durban point that duplicates the name of the town Richmond (KwaZulu-Natal) and cannot be identified with a known suburb"
+    },
+    {
+      "geonameId": 3359735,
+      "name": "Vredendal",
+      "reason": "Unpopulated farm-area point near Botrivier sharing the name of the town Vredendal (3359736, West Coast)"
+    },
+    {
+      "geonameId": 8030242,
+      "name": "Nelspruti",
+      "reason": "Misspelt duplicate of Nelspruit (Mbombela) itself"
+    },
+    {
+      "geonameId": 6941901,
+      "name": "Garden Route",
+      "reason": "Name of the tourism region, not a suburb of Knysna"
+    }
   ],
   "rename": [
-    { "geonameId": 1021360, "name": "Ballitoville", "to": "Ballito", "reason": "Commonly used name" },
-    { "geonameId": 980595, "name": "Mafikeng", "to": "Mahikeng", "reason": "Official name since 2010" },
-    { "geonameId": 1000501, "name": "Grahamstown", "to": "Makhanda", "reason": "Official name since 2018" },
-    { "geonameId": 1000543, "name": "Graaff Reinet", "to": "Graaff-Reinet", "reason": "Standard spelling" },
-    { "geonameId": 949880, "name": "Thembisa", "to": "Tembisa", "reason": "Official spelling" },
-    { "geonameId": 991353, "name": "Kenton", "to": "Kenton-on-Sea", "reason": "Commonly used name" },
-    { "geonameId": 941966, "name": "Bela Bela", "to": "Bela-Bela", "reason": "Official spelling" },
-    { "geonameId": 973111, "name": "Mpumalanga", "to": "Mpumalanga Township", "reason": "Avoid confusion with the province name" }
+    {
+      "geonameId": 1021360,
+      "name": "Ballitoville",
+      "to": "Ballito",
+      "reason": "Commonly used name"
+    },
+    {
+      "geonameId": 980595,
+      "name": "Mafikeng",
+      "to": "Mahikeng",
+      "reason": "Official name since 2010"
+    },
+    {
+      "geonameId": 1000501,
+      "name": "Grahamstown",
+      "to": "Makhanda",
+      "reason": "Official name since 2018, widely adopted"
+    },
+    {
+      "geonameId": 1000543,
+      "name": "Graaff Reinet",
+      "to": "Graaff-Reinet",
+      "reason": "Standard spelling"
+    },
+    {
+      "geonameId": 949880,
+      "name": "Thembisa",
+      "to": "Tembisa",
+      "reason": "Official spelling"
+    },
+    {
+      "geonameId": 991353,
+      "name": "Kenton",
+      "to": "Kenton-on-Sea",
+      "reason": "Commonly used name"
+    },
+    {
+      "geonameId": 941966,
+      "name": "Bela Bela",
+      "to": "Bela-Bela",
+      "reason": "Official spelling"
+    },
+    {
+      "geonameId": 973111,
+      "name": "Mpumalanga",
+      "to": "Mpumalanga Township",
+      "reason": "Avoid confusion with the province name"
+    },
+    {
+      "geonameId": 963516,
+      "name": "Queenstown",
+      "to": "Komani (Queenstown)",
+      "reason": "Renamed Komani (Government Gazette 39669, Feb 2016); former name kept in brackets because it is still widely used"
+    },
+    {
+      "geonameId": 985011,
+      "name": "Lady Frere",
+      "to": "Cacadu (Lady Frere)",
+      "reason": "Renamed Cacadu (Gazette 39669, Feb 2016); former name kept in brackets"
+    },
+    {
+      "geonameId": 973525,
+      "name": "Mount Frere",
+      "to": "KwaBhaca (Mount Frere)",
+      "reason": "Renamed KwaBhaca (Gazette 39669, Feb 2016); former name kept in brackets"
+    },
+    {
+      "geonameId": 973551,
+      "name": "Mount Ayliff",
+      "to": "Maxesibeni (Mount Ayliff)",
+      "reason": "Renamed Maxesibeni (Gazette 39669, Feb 2016); former name kept in brackets"
+    },
+    {
+      "geonameId": 1005781,
+      "name": "Khowa",
+      "to": "Khowa (Elliot)",
+      "reason": "Elliot was renamed Khowa (Gazette 39669, Feb 2016); former name kept in brackets"
+    },
+    {
+      "geonameId": 980798,
+      "name": "Maclear",
+      "to": "Nqanqarhu (Maclear)",
+      "reason": "Renamed Nqanqarhu (2021); former name kept in brackets. Gazette notice not located — date from secondary sources"
+    },
+    {
+      "geonameId": 981158,
+      "name": "Lydenburg",
+      "to": "Mashishing (Lydenburg)",
+      "reason": "Official name Mashishing (2006); Lydenburg still dominant in everyday use"
+    },
+    {
+      "geonameId": 971534,
+      "name": "Mbombela",
+      "to": "Mbombela (Nelspruit)",
+      "reason": "Official name Mbombela (2009); Nelspruit still widely used"
+    },
+    {
+      "geonameId": 939270,
+      "name": "Emalahleni",
+      "to": "eMalahleni (Witbank)",
+      "reason": "Official name eMalahleni; Witbank still widely used"
+    },
+    {
+      "geonameId": 12718829,
+      "name": "Emgwenya",
+      "to": "Emgwenya (Waterval Boven)",
+      "reason": "Official name Emgwenya; Waterval Boven still widely used"
+    },
+    {
+      "geonameId": 1021770,
+      "name": "eManzana",
+      "to": "eManzana (Badplaas)",
+      "reason": "Official name eManzana; Badplaas still widely used"
+    },
+    {
+      "geonameId": 1007514,
+      "name": "Duiwelskloof",
+      "to": "Modjadjiskloof",
+      "reason": "Official name since 2004 and in common use"
+    },
+    {
+      "geonameId": 1018148,
+      "name": "Bochum",
+      "to": "Senwabarwana (Bochum)",
+      "reason": "Official name Senwabarwana; Bochum still widely used"
+    },
+    {
+      "geonameId": 964408,
+      "name": "Port Saint John’s",
+      "to": "Port St Johns",
+      "reason": "Standard spelling; GeoNames uses a curly apostrophe"
+    },
+    {
+      "geonameId": 1015969,
+      "name": "Winnie Mandela",
+      "to": "Winnie Mandela (Brandfort)",
+      "reason": "Brandfort renamed Winnie Mandela (gazetted Aug 2021); former name kept in brackets"
+    },
+    {
+      "geonameId": 1013266,
+      "name": "Hlohlolwane",
+      "to": "Clocolan",
+      "reason": "This row sits on Clocolan town and carries its population; GeoNames has no Clocolan row (Hlohlolwane is its township)"
+    },
+    {
+      "geonameId": 965571,
+      "name": "Mamafubedu",
+      "to": "Petrus Steyn",
+      "reason": "This row sits on Petrus Steyn town and carries its population; GeoNames has no Petrus Steyn row (Mamafubedu is its township)"
+    },
+    {
+      "geonameId": 1017354,
+      "name": "Bosbokrand",
+      "to": "Bushbuckridge",
+      "reason": "English name in common and official use"
+    },
+    {
+      "geonameId": 11204240,
+      "name": "Lukwatini",
+      "to": "Elukwatini",
+      "reason": "Standard spelling"
+    },
+    {
+      "geonameId": 948542,
+      "name": "Tokoza",
+      "to": "Thokoza",
+      "reason": "Standard spelling"
+    },
+    {
+      "geonameId": 12718856,
+      "name": "Nuwerus NC",
+      "to": "Nuwerus",
+      "reason": "GeoNames suffix 'NC' is not part of the name"
+    },
+    {
+      "geonameId": 946016,
+      "name": "Umzimkulu",
+      "to": "Umzimkhulu",
+      "reason": "Official spelling (Umzimkhulu municipality)"
+    },
+    {
+      "geonameId": 958273,
+      "name": "Saint Lucia",
+      "to": "St Lucia",
+      "reason": "Commonly used name"
+    },
+    {
+      "geonameId": 1005470,
+      "name": "Ngcobo",
+      "to": "Ngcobo (Engcobo)",
+      "reason": "Town known by both names; brackets help search"
+    },
+    {
+      "geonameId": 12718860,
+      "name": "Pella WC",
+      "to": "Pella",
+      "reason": "GeoNames suffix 'WC' is not part of the name"
+    }
   ]
 }
