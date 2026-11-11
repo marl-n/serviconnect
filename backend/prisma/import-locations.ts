@@ -19,17 +19,21 @@
  * 2. Preview what would be imported (no database writes) and save the full review report:
  *      npm run import:locations -- --dry-run --report prisma/data/geonames/dry-run-report.json
  *
- * 3. Import:
+ * 3. Import (refused while the plan has blocking issues):
  *      npm run import:locations
+ *
+ * The dataset is curated, not exhaustive: municipal seats, places with population ≥ 5,000,
+ * one selectable city per metro, and the reviewed decisions in <dir>/overrides.json
+ * (see the rules on buildImportPlan in src/locations/geonames.ts).
  *
  * Options:
  *   --dir <folder>             where ZA.txt + admin1CodesASCII.txt live (default prisma/data/geonames)
- *   --min-population <n>       skip towns below this population (default 0 = keep all)
- *   --max-suburb-km <n>        max distance from a suburb to its parent town (default 40)
- *   --parent-min-population <n> non-seat towns at/above this population can parent suburbs (default 5000)
+ *   --overrides <file>         curation overrides (default <dir>/overrides.json; required)
+ *   --min-population <n>       PPL places at/above this population qualify as towns (default 5000)
+ *   --max-suburb-km <n>        max distance from a suburb to an automatically chosen parent (default 15)
  *   --hierarchy <file>         hierarchy.txt to use (default <dir>/hierarchy.txt if present)
  *   --no-hierarchy             ignore hierarchy.txt even if present (nearest-town matching only)
- *   --report <file>            write the full review report (stats + every flagged record) as JSON
+ *   --report <file>            write the full review report (every town, suburb and flag) as JSON
  *   --dry-run                  parse + report only
  *
  * GeoNames data is licensed CC BY 4.0 — credit "GeoNames (geonames.org)" somewhere in the product.
@@ -43,6 +47,7 @@ import {
   parseAdmin1,
   parsePlaceLine,
   parseHierarchyLine,
+  parseCuration,
   normName,
   DEFAULT_OPTIONS,
   GeonamesPlace,
@@ -183,7 +188,7 @@ interface CliArgs {
   dryRun: boolean;
   minTownPopulation: number;
   maxSuburbKm: number;
-  parentMinPopulation: number;
+  overridesFile: string | null;
   hierarchyFile: string | null;
   useHierarchy: boolean;
   reportFile: string | null;
@@ -196,7 +201,7 @@ function parseArgs(argv: string[]): CliArgs {
     dryRun: false,
     minTownPopulation: DEFAULT_OPTIONS.minTownPopulation,
     maxSuburbKm: DEFAULT_OPTIONS.maxSuburbKm,
-    parentMinPopulation: DEFAULT_OPTIONS.parentMinPopulation,
+    overridesFile: null,
     hierarchyFile: null,
     useHierarchy: true,
     reportFile: null,
@@ -209,17 +214,13 @@ function parseArgs(argv: string[]): CliArgs {
     else if (a === '--country') args.country = next().toUpperCase();
     else if (a === '--min-population') args.minTownPopulation = Number(next());
     else if (a === '--max-suburb-km') args.maxSuburbKm = Number(next());
-    else if (a === '--parent-min-population') args.parentMinPopulation = Number(next());
+    else if (a === '--overrides') args.overridesFile = path.resolve(next());
     else if (a === '--hierarchy') args.hierarchyFile = path.resolve(next());
     else if (a === '--no-hierarchy') args.useHierarchy = false;
     else if (a === '--report') args.reportFile = path.resolve(next());
     else throw new Error(`Unknown option: ${a}`);
   }
-  for (const [k, v] of Object.entries({
-    minTownPopulation: args.minTownPopulation,
-    maxSuburbKm: args.maxSuburbKm,
-    parentMinPopulation: args.parentMinPopulation,
-  })) {
+  for (const [k, v] of Object.entries({ minTownPopulation: args.minTownPopulation, maxSuburbKm: args.maxSuburbKm })) {
     if (!Number.isFinite(v) || v < 0) throw new Error(`Invalid value for ${k}`);
   }
   return args;
@@ -236,8 +237,8 @@ async function loadPlaces(file: string): Promise<GeonamesPlace[]> {
 }
 
 /**
- * Streams hierarchy.txt (global — millions of rows) keeping only non-ADM edges whose
- * child is one of the wanted suburb ids. ADM rows describe the admin tree, not suburbs.
+ * Streams hierarchy.txt (global — hundreds of thousands of rows) keeping only non-ADM edges whose
+ * child is one of the wanted ids. ADM rows describe the admin tree, not suburbs.
  */
 async function loadHierarchy(file: string, wantedChildIds: Set<number>): Promise<Map<number, number[]>> {
   const rl = readline.createInterface({ input: fs.createReadStream(file, { encoding: 'utf8' }), crlfDelay: Infinity });
@@ -255,34 +256,29 @@ async function loadHierarchy(file: string, wantedChildIds: Set<number>): Promise
 function printReport(plan: ImportPlan, hierarchyNote: string) {
   const st = plan.stats;
   const n = (v: number) => v.toLocaleString('en-ZA');
-  const pct = (v: number, of: number) => (of ? ` (${((v / of) * 100).toFixed(1)}%)` : '');
-  console.log('\nImport plan');
-  console.log('═══════════');
+  const kv = (o: Record<string, number>) => Object.entries(o).map(([k, v]) => `${k}=${n(v)}`).join(', ') || 'none';
+  console.log('\nImport plan (curated)');
+  console.log('═════════════════════');
   console.log(`Provinces: ${plan.provinces.length}`);
-  console.log('\nTowns per province');
   const width = Math.max(...Object.keys(st.townsPerProvince).map(k => k.length), 8);
-  for (const [name, count] of Object.entries(st.townsPerProvince).sort((a, b) => a[0].localeCompare(b[0]))) {
-    console.log(`  ${name.padEnd(width)}  ${n(count).padStart(7)}`);
+  console.log(`\n  ${'Province'.padEnd(width)}    Towns  Suburbs`);
+  for (const name of Object.keys(st.townsPerProvince).sort()) {
+    console.log(`  ${name.padEnd(width)}  ${n(st.townsPerProvince[name]).padStart(7)}  ${n(st.suburbsPerProvince[name]).padStart(7)}`);
   }
-  console.log(`  ${'TOTAL'.padEnd(width)}  ${n(st.towns).padStart(7)}`);
-  console.log(`  candidates ${n(st.townCandidates)} → merged duplicates ${n(st.duplicateTownsDropped)}, below min population ${n(st.townsBelowMinPopulation)}, no province match ${n(st.skippedNoProvince)}`);
-  const ignored = Object.entries(st.ignoredByFeatureCode).sort((a, b) => b[1] - a[1]);
-  if (ignored.length) console.log(`  ignored populated-place codes: ${ignored.map(([c, k]) => `${c}=${n(k)}`).join(', ')}`);
+  console.log(`  ${'TOTAL'.padEnd(width)}  ${n(st.towns).padStart(7)}  ${n(st.suburbs).padStart(7)}`);
+  console.log(`\nTowns by rule: ${kv(st.townsBySource)}; same-name rows merged: ${n(st.duplicateTownsMerged)}`);
+  console.log(`Excluded places: ${kv(st.excludedByReason)}; no province match: ${n(st.skippedNoProvince)}`);
+  console.log(`Ignored populated-place codes: ${kv(st.ignoredByFeatureCode)}`);
 
-  console.log(`\nSuburbs: ${n(st.suburbs)} imported (from ${n(st.suburbCandidates)} PPLX candidates)`);
-  console.log(`  ${hierarchyNote}`);
-  console.log('  parent source:');
-  console.log(`    explicit hierarchy edge       ${n(st.suburbsAssignedExplicit).padStart(7)}${pct(st.suburbsAssignedExplicit, st.suburbCandidates)}`);
-  console.log(`    nearest, same district        ${n(st.suburbsAssignedSameDistrict).padStart(7)}${pct(st.suburbsAssignedSameDistrict, st.suburbCandidates)}`);
-  console.log(`    nearest, province-wide (weak) ${n(st.suburbsAssignedProvinceWide).padStart(7)}${pct(st.suburbsAssignedProvinceWide, st.suburbCandidates)}`);
-  console.log(`    unassigned (not imported)     ${n(st.suburbsUnassigned).padStart(7)}${pct(st.suburbsUnassigned, st.suburbCandidates)}`);
-  console.log(`  suburbs with a non-ADM hierarchy edge: ${n(st.suburbsWithHierarchyEdge)}; ambiguous (several parents): ${n(st.suburbsExplicitAmbiguous)}; rejected (wrong province): ${n(st.suburbsExplicitRejected)}`);
-  console.log(`  WITHOUT a reliable parent (weak + unassigned): ${n(st.suburbsWithoutReliableParent)}${pct(st.suburbsWithoutReliableParent, st.suburbCandidates)}`);
-  if (st.suburbDistanceKm) {
-    console.log(`  distance to parent: median ${st.suburbDistanceKm.median} km, p90 ${st.suburbDistanceKm.p90} km, max ${st.suburbDistanceKm.max} km`);
-  }
-  console.log(`  dropped: same name as parent town ${n(st.suburbsSameNameAsTown)}, duplicate names ${n(st.duplicateSuburbsDropped)}`);
-  console.log(`\nTowns with no suburbs: ${n(st.townsWithoutSuburbs)} of ${n(st.towns)}${pct(st.townsWithoutSuburbs, st.towns)}`);
+  console.log(`\nSuburbs: ${n(st.suburbs)} imported from ${n(st.suburbCandidates)} candidates (${hierarchyNote})`);
+  console.log(`  parent source: ${kv(st.suburbsBySource)}`);
+  console.log(`  not imported: no parent ${n(st.suburbsUnassigned)}, same name as parent ${n(st.suburbsSameNameAsTown)}, duplicates ${n(st.duplicateSuburbsDropped)}`);
+  if (st.suburbDistanceKm) console.log(`  distance to parent: median ${st.suburbDistanceKm.median} km, p90 ${st.suburbDistanceKm.p90} km, max ${st.suburbDistanceKm.max} km`);
+  console.log(`  towns with no suburbs: ${n(st.townsWithoutSuburbs)} of ${n(st.towns)} (suburbs are optional)`);
+
+  const byCity = new Map<string, number>();
+  for (const m of plan.metroAbsorbed) byCity.set(m.city, (byCity.get(m.city) ?? 0) + 1);
+  console.log(`\nTown-sized places absorbed into a metro city: ${[...byCity].map(([c, k]) => `${c}=${k}`).join(', ') || 'none'}`);
 
   console.log('\nFlagged for review (full list via --report)');
   const byKind = new Map<string, ImportPlan['suspicious']>();
@@ -292,16 +288,63 @@ function printReport(plan: ImportPlan, hierarchyNote: string) {
     console.log(`  ${kind}: ${n(list.length)}`);
     for (const r of list.slice(0, 5)) console.log(`      - ${r.name} [${r.geonameId}] ${r.detail}`);
   }
+
+  console.log(plan.blocking.length ? `\nBLOCKING (${plan.blocking.length}) — fix in overrides.json before importing:` : '\nBlocking issues: none');
+  for (const b of plan.blocking) console.log(`  x ${b}`);
+}
+
+/** Full review report: every province → town (with the rule that admitted it) → suburbs, plus all flags. */
+function writeReport(file: string, plan: ImportPlan, meta: Record<string, unknown>) {
+  const suburbsByTown = new Map<number, string[]>();
+  for (const s of plan.suburbs) {
+    const list = suburbsByTown.get(s.townGeonameId) ?? [];
+    list.push(s.name);
+    suburbsByTown.set(s.townGeonameId, list);
+  }
+  const provinces = plan.provinces.map(p => ({
+    name: p.name,
+    geonamesCode: p.geonamesCode,
+    towns: plan.towns
+      .filter(t => t.provinceCode === p.geonamesCode)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(t => ({
+        name: t.name,
+        geonameId: t.geonameId,
+        rule: t.source,
+        featureCode: t.featureCode,
+        population: t.population,
+        district: t.admin2,
+        suburbs: (suburbsByTown.get(t.geonameId) ?? []).sort((a, b) => a.localeCompare(b)),
+      })),
+  }));
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(
+    file,
+    JSON.stringify(
+      {
+        generatedAt: new Date().toISOString(),
+        ...meta,
+        stats: plan.stats,
+        blocking: plan.blocking,
+        metroAbsorbed: plan.metroAbsorbed,
+        flagged: plan.suspicious,
+        provinces,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const placesFile = path.join(args.dir, `${args.country}.txt`);
   const adminFile = path.join(args.dir, 'admin1CodesASCII.txt');
+  const overridesFile = args.overridesFile ?? path.join(args.dir, 'overrides.json');
 
-  const missing = [placesFile, adminFile].filter(f => !fs.existsSync(f));
+  const missing = [placesFile, adminFile, overridesFile].filter(f => !fs.existsSync(f));
   if (missing.length) {
-    console.error(`Missing GeoNames file(s):\n  ${missing.join('\n  ')}\nSee the download steps at the top of prisma/import-locations.ts.`);
+    console.error(`Missing file(s):\n  ${missing.join('\n  ')}\nSee the download steps at the top of prisma/import-locations.ts.`);
     process.exit(1);
   }
 
@@ -311,69 +354,51 @@ async function main() {
     process.exit(1);
   }
   if (args.country === 'ZA' && admin1.size !== 9) {
-    console.warn(`WARNING: South Africa has 9 provinces but admin1CodesASCII.txt lists ${admin1.size} for ZA — check the file.`);
+    console.error(`South Africa has 9 provinces but admin1CodesASCII.txt lists ${admin1.size} for ZA — check the file.`);
+    process.exit(1);
   }
+  const curation = parseCuration(fs.readFileSync(overridesFile, 'utf8'));
 
   console.log(`Reading ${placesFile} ...`);
   const places = await loadPlaces(placesFile);
 
   let hierarchy = new Map<number, number[]>();
-  let hierarchyNote = 'hierarchy.txt: not used — nearest-town matching only';
+  let hierarchyNote = 'hierarchy.txt not used';
   const hierarchyFile = args.hierarchyFile ?? path.join(args.dir, 'hierarchy.txt');
   if (!args.useHierarchy) {
-    hierarchyNote = 'hierarchy.txt: disabled (--no-hierarchy) — nearest-town matching only';
+    hierarchyNote = 'hierarchy.txt disabled (--no-hierarchy)';
   } else if (fs.existsSync(hierarchyFile)) {
     console.log(`Reading ${hierarchyFile} (streaming) ...`);
-    const wanted = new Set(places.filter(p => p.featureCode === 'PPLX').map(p => p.geonameId));
-    hierarchy = await loadHierarchy(hierarchyFile, wanted);
-    hierarchyNote = `hierarchy.txt: used (${hierarchyFile}) — nearest-town matching is the fallback`;
+    hierarchy = await loadHierarchy(hierarchyFile, new Set(places.map(p => p.geonameId)));
+    hierarchyNote = 'hierarchy.txt used, nearest-town fallback';
   } else if (args.hierarchyFile) {
     console.error(`Hierarchy file not found: ${hierarchyFile}`);
     process.exit(1);
   } else {
-    hierarchyNote = 'hierarchy.txt: not found in the data folder — nearest-town matching only';
+    hierarchyNote = 'hierarchy.txt not found, nearest-town matching only';
   }
 
-  const plan = buildImportPlan(
-    places,
-    admin1,
-    {
-      minTownPopulation: args.minTownPopulation,
-      maxSuburbKm: args.maxSuburbKm,
-      parentMinPopulation: args.parentMinPopulation,
-    },
-    hierarchy,
-  );
+  const options = { minTownPopulation: args.minTownPopulation, maxSuburbKm: args.maxSuburbKm };
+  const plan = buildImportPlan(places, admin1, options, hierarchy, curation);
 
   printReport(plan, hierarchyNote);
 
   if (args.reportFile) {
-    const provinceName = new Map(plan.provinces.map(p => [p.geonamesCode, p.name]));
-    const withSuburbs = new Set(plan.suburbs.map(x => x.townGeonameId));
-    fs.mkdirSync(path.dirname(args.reportFile), { recursive: true });
-    fs.writeFileSync(
-      args.reportFile,
-      JSON.stringify(
-        {
-          generatedAt: new Date().toISOString(),
-          options: { minTownPopulation: args.minTownPopulation, maxSuburbKm: args.maxSuburbKm, parentMinPopulation: args.parentMinPopulation, hierarchy: hierarchyNote },
-          stats: plan.stats,
-          townsWithoutSuburbs: plan.towns
-            .filter(t => !withSuburbs.has(t.geonameId))
-            .map(t => `${t.name} (${provinceName.get(t.provinceCode)})`)
-            .sort(),
-          flagged: plan.suspicious,
-        },
-        null,
-        2,
-      ),
-    );
+    writeReport(args.reportFile, plan, {
+      options: { ...DEFAULT_OPTIONS, ...options },
+      hierarchy: hierarchyNote,
+      overrides: path.basename(overridesFile),
+    });
     console.log(`\nFull review report written to ${args.reportFile}`);
   }
 
   if (args.dryRun) {
     console.log('\nDry run — nothing written.');
     return;
+  }
+  if (plan.blocking.length) {
+    console.error(`\nRefusing to import: ${plan.blocking.length} blocking issue(s) listed above.`);
+    process.exit(1);
   }
 
   const prisma = new PrismaClient();
