@@ -12,8 +12,8 @@ import {
   Image,
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { leadsApi } from '../../services/api';
-import { Lead, LeadStatus } from '../../types';
+import { leadsApi, serviceRequestsApi } from '../../services/api';
+import { Lead, LeadStatus, ServiceRequest } from '../../types';
 import BusinessProfileScreen from './BusinessProfileScreen';
 import ReviewFormScreen from './ReviewFormScreen';
 
@@ -466,6 +466,41 @@ function EmptyState({
   );
 }
 
+// ─── Request progress ────────────────────────────────────────────────────────
+
+/** One-line progress for a marketplace request, from its matched leads and the responses received. */
+function requestProgress(req: ServiceRequest, responses: Lead[]): { text: string; tone: 'wait' | 'action' | 'done' } {
+  if (req.status === 'CANCELLED') return { text: 'Cancelled', tone: 'done' };
+  if (req.status === 'EXPIRED') return { text: 'Expired', tone: 'done' };
+  if (req.status === 'FULFILLED') return { text: 'You hired a business', tone: 'done' };
+  const matched = req.leads?.length ?? 0;
+  const quotes = responses.filter(l => l.quotes?.length > 0).length;
+  if (matched === 0) return { text: 'Looking for businesses in your area…', tone: 'wait' };
+  if (responses.length === 0) return { text: `Sent to ${matched} business${matched === 1 ? '' : 'es'} · waiting for responses`, tone: 'wait' };
+  return {
+    text: `${responses.length} business${responses.length === 1 ? '' : 'es'} responded · ${quotes} quote${quotes === 1 ? '' : 's'} — tap to compare`,
+    tone: 'action',
+  };
+}
+
+function RequestCard({ req, responses, selected, onPress }: {
+  req: ServiceRequest; responses: Lead[]; selected: boolean; onPress: () => void;
+}) {
+  const p = requestProgress(req, responses);
+  const where = [req.suburb?.name, req.town?.name].filter(Boolean).join(', ');
+  return (
+    <TouchableOpacity style={[s.reqCard, selected && s.reqCardOn]} onPress={onPress} activeOpacity={0.85}>
+      <View style={{ flex: 1 }}>
+        <Text style={s.reqTitle} numberOfLines={1}>{req.subCategory?.name ?? req.category?.name}{where ? ` · ${where}` : ''}</Text>
+        <Text style={[s.reqProgress, p.tone === 'action' && s.reqProgressAction, p.tone === 'done' && s.reqProgressDone]}>{p.text}</Text>
+      </View>
+      <FontAwesome name={selected ? 'times-circle' : 'chevron-right'} size={14} color={selected ? '#1A56F0' : '#C4C9D4'} />
+    </TouchableOpacity>
+  );
+}
+
+const quoteAmount = (l: Lead) => (l.quotes?.[0] ? l.quotes[0].amount : Number.MAX_SAFE_INTEGER);
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function MyQuotesScreen({ onViewBusiness }: Props) {
@@ -477,12 +512,15 @@ export default function MyQuotesScreen({ onViewBusiness }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [viewingSlug, setViewingSlug] = useState<string | null>(null);
   const [reviewTarget, setReviewTarget] = useState<{ businessId: string; businessName: string } | null>(null);
+  const [requests, setRequests] = useState<ServiceRequest[]>([]);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
     try {
-      const res = await leadsApi.getMyLeads();
+      const [res, reqRes] = await Promise.all([leadsApi.getMyLeads(), serviceRequestsApi.getMine()]);
       setLeads(res.data ?? []);
+      setRequests(reqRes.data ?? []);
     } catch (err) {
       console.error('MyQuotesScreen load error:', err);
     } finally {
@@ -504,9 +542,14 @@ export default function MyQuotesScreen({ onViewBusiness }: Props) {
     setExpandedId(null);
   };
 
-  const filteredLeads = activeFilter === 'ALL'
-    ? leads
-    : leads.filter(l => l.status === activeFilter);
+  const responsesFor = (requestId: string) => leads.filter(l => l.serviceRequestId === requestId);
+  const selectedRequest = requests.find(r => r.id === selectedRequestId);
+  const filteredLeads = selectedRequestId
+    // Comparing one request's responses: cheapest quote first, businesses without a quote last
+    ? [...responsesFor(selectedRequestId)].sort((a, b) => quoteAmount(a) - quoteAmount(b))
+    : activeFilter === 'ALL'
+      ? leads
+      : leads.filter(l => l.status === activeFilter);
 
   // Conditional returns after all hooks
   if (reviewTarget) {
@@ -569,6 +612,26 @@ export default function MyQuotesScreen({ onViewBusiness }: Props) {
           />
         }>
 
+        {requests.length > 0 && (
+          <View style={s.reqSection}>
+            <Text style={s.reqSectionTitle}>My service requests</Text>
+            {requests.map(r => (
+              <RequestCard
+                key={r.id}
+                req={r}
+                responses={responsesFor(r.id)}
+                selected={selectedRequestId === r.id}
+                onPress={() => { setSelectedRequestId(selectedRequestId === r.id ? null : r.id); setExpandedId(null); }}
+              />
+            ))}
+          </View>
+        )}
+
+        {selectedRequest ? (
+          <Text style={s.compareTitle}>
+            Responses for {selectedRequest.subCategory?.name ?? 'your request'} — cheapest quote first
+          </Text>
+        ) : (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -590,8 +653,11 @@ export default function MyQuotesScreen({ onViewBusiness }: Props) {
             );
           })}
         </ScrollView>
+        )}
 
-        {filteredLeads.length === 0 ? (
+        {selectedRequest && filteredLeads.length === 0 ? (
+          <Text style={s.compareEmpty}>No responses yet. Businesses that unlock your request will appear here.</Text>
+        ) : filteredLeads.length === 0 ? (
           <EmptyState
             filter={activeFilter}
             onClearFilter={activeFilter !== 'ALL' ? () => handleFilterChange('ALL') : undefined}
@@ -624,6 +690,16 @@ export default function MyQuotesScreen({ onViewBusiness }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
+  reqSection: { paddingHorizontal: 14, paddingTop: 12 },
+  reqSectionTitle: { fontSize: 13, fontWeight: '700', color: '#111827', marginBottom: 8 },
+  reqCard: { backgroundColor: '#fff', borderRadius: 12, borderWidth: 0.5, borderColor: '#E5E7EB', padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  reqCardOn: { borderColor: '#1A56F0', borderWidth: 1, backgroundColor: '#EFF6FF' },
+  reqTitle: { fontSize: 13, fontWeight: '700', color: '#111827' },
+  reqProgress: { fontSize: 12, color: '#6B7280', marginTop: 3 },
+  reqProgressAction: { color: '#6D28D9', fontWeight: '600' },
+  reqProgressDone: { color: '#065F46' },
+  compareTitle: { fontSize: 12, fontWeight: '700', color: '#1A56F0', paddingHorizontal: 16, paddingTop: 6, paddingBottom: 8 },
+  compareEmpty: { fontSize: 13, color: '#6B7280', paddingHorizontal: 16, paddingVertical: 12 },
   container: { flex: 1, backgroundColor: '#F4F6FB' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 },
   loadingText: { marginTop: 12, fontSize: 13, color: '#9CA3AF' },

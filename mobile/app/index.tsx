@@ -8,6 +8,7 @@ import SearchScreen from '../src/screens/customer/SearchScreen';
 import ProfileScreen from '../src/screens/customer/ProfileScreen';
 import DashboardScreen from '../src/screens/business/DashboardScreen';
 import OnboardingScreen from '../src/screens/business/OnboardingScreen';
+import LeadSettingsScreen from '../src/screens/business/LeadSettingsScreen';
 import MyQuotesScreen from '../src/screens/customer/MyQuotesScreen';
 import SavedScreen from '../src/screens/customer/SavedScreen';
 import NewServiceRequestScreen from '../src/screens/customer/NewServiceRequestScreen';
@@ -23,6 +24,7 @@ export default function Index() {
   const [appState, setAppState] = useState<AppState | null>(null);
   const [checking, setChecking] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('search');
+  const [needsLeadSetup, setNeedsLeadSetup] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem('sc_token').then(async token => {
@@ -81,7 +83,12 @@ export default function Index() {
 
   // Business user with no profile — show onboarding
   if (user.role === 'BUSINESS' && !business) return (
-    <OnboardingScreen onComplete={(biz) => setAppState({ user, business: biz })} />
+    <OnboardingScreen onComplete={(biz) => { setAppState({ user, business: biz }); setNeedsLeadSetup(true); }} />
+  );
+
+  // Just onboarded — choose service types and towns before the dashboard
+  if (user.role === 'BUSINESS' && business && needsLeadSetup) return (
+    <LeadSettingsScreen business={business} firstRun onDone={() => setNeedsLeadSetup(false)} />
   );
 
   // Business user with profile — show dashboard

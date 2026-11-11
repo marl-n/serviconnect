@@ -5,8 +5,9 @@ import {
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { searchApi, businessApi, categoryQuestionsApi, serviceRequestsApi } from '../../services/api';
-import { Category, SubCategory, CategoryQuestion } from '../../types';
+import { searchApi, businessApi, categoryQuestionsApi, serviceRequestsApi, uploadsApi } from '../../services/api';
+import { Category, SubCategory, CategoryQuestion, JobLocation } from '../../types';
+import LocationPicker from '../../components/LocationPicker';
 
 interface Props {
   onBack?: () => void;
@@ -47,8 +48,10 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
   const [jobAddress, setJobAddress] = useState('');
   const [jobDate, setJobDate] = useState('');
   const [budget, setBudget] = useState('');
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [location, setLocation] = useState<JobLocation | undefined>();
+  const [photos, setPhotos] = useState<{ uri: string; mimeType?: string }[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [submitStage, setSubmitStage] = useState('');
 
   useEffect(() => {
     loadCategories();
@@ -171,6 +174,7 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
     setJobAddress('');
     setJobDate('');
     setBudget('');
+    setLocation(undefined);
     setPhotos([]);
   };
 
@@ -187,15 +191,18 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
         quality: 0.7,
       });
       if (result.canceled) return;
-      const picked = result.assets.map(a => a.uri);
-      setPhotos(prev => Array.from(new Set([...prev, ...picked])).slice(0, MAX_PHOTOS));
+      setPhotos(prev => {
+        const seen = new Set(prev.map(p => p.uri));
+        const added = result.assets.filter(a => !seen.has(a.uri)).map(a => ({ uri: a.uri, mimeType: a.mimeType ?? undefined }));
+        return [...prev, ...added].slice(0, MAX_PHOTOS);
+      });
     } catch {
       Alert.alert('Error', 'Could not open your photo library. Please try again.');
     }
   };
 
   const removePhoto = (uri: string) => {
-    setPhotos(prev => prev.filter(u => u !== uri));
+    setPhotos(prev => prev.filter(p => p.uri !== uri));
   };
 
   const submit = async () => {
@@ -212,10 +219,24 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
       Alert.alert('Error', 'Please select a category and service type before submitting.');
       return;
     }
+    if (!location) {
+      Alert.alert('Required', 'Please choose the town or city where the job is.');
+      return;
+    }
 
     setSubmitting(true);
     try {
+      // Upload photos first; the request stores only the returned URLs.
+      const photoUrls: string[] = [];
+      for (let i = 0; i < photos.length; i++) {
+        setSubmitStage(`Uploading photo ${i + 1} of ${photos.length}…`);
+        photoUrls.push(await uploadsApi.image(photos[i].uri, photos[i].mimeType));
+      }
+      setSubmitStage('Submitting…');
       await serviceRequestsApi.create({
+        townId: location.town.id,
+        suburbId: location.suburb?.id,
+        photos: photoUrls.length > 0 ? photoUrls : undefined,
         categoryId,
         subCategoryId,
         message: message.trim(),
@@ -237,6 +258,7 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
       Alert.alert('Error', msg);
     } finally {
       setSubmitting(false);
+      setSubmitStage('');
     }
   };
 
@@ -493,15 +515,18 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
         <Text style={s.hint}>{message.length}/2000</Text>
       </View>
 
+      <LocationPicker value={location} onChange={setLocation} />
+
       <View style={s.field}>
-        <Text style={s.label}>Job address</Text>
+        <Text style={s.label}>Street address or landmark</Text>
         <TextInput
           style={s.input}
-          placeholder="e.g. 12 Main Street, Kempton Park"
+          placeholder="e.g. 12 Main Street, unit 4"
           placeholderTextColor="#9CA3AF"
           value={jobAddress}
           onChangeText={setJobAddress}
         />
+        <Text style={s.hint}>Optional</Text>
       </View>
 
     
@@ -523,7 +548,7 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
         <Text style={s.label}>Add photos</Text>
         {photos.length > 0 && (
           <View style={s.photoGrid}>
-            {photos.map(uri => (
+            {photos.map(({ uri }) => (
               <View key={uri} style={s.photoThumbWrap}>
                 <Image source={{ uri }} style={s.photoThumb} />
                 <TouchableOpacity
@@ -605,11 +630,11 @@ export default function NewServiceRequestScreen({ onBack, onSuccess }: Props) {
         {step === 4 && (
           <View style={s.actions}>
             <TouchableOpacity
-              style={[s.nextBtn, (!message.trim() || submitting) && s.btnDisabled]}
+              style={[s.nextBtn, (!message.trim() || !location || submitting) && s.btnDisabled]}
               onPress={submit}
-              disabled={!message.trim() || submitting}>
+              disabled={!message.trim() || !location || submitting}>
               {submitting
-                ? <ActivityIndicator color="#fff" />
+                ? <><ActivityIndicator color="#fff" />{!!submitStage && <Text style={[s.nextBtnText, { marginLeft: 8 }]}>{submitStage}</Text>}</>
                 : <>
                     <FontAwesome name="check" size={14} color="#fff" style={{ marginRight: 8 }} />
                     <Text style={s.nextBtnText}>Submit Request</Text>

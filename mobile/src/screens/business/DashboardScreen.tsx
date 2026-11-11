@@ -4,8 +4,9 @@ import {
   StyleSheet, ActivityIndicator, RefreshControl
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { businessApi, leadsApi } from '../../services/api';
+import { businessApi, leadsApi, creditsApi } from '../../services/api';
 import LeadDetailScreen from './LeadDetailScreen';
+import LeadSettingsScreen from './LeadSettingsScreen';
 
 interface Props {
   onViewLead: (leadId: string) => void;
@@ -29,6 +30,9 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string>('ALL');
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [setupMissing, setSetupMissing] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -37,12 +41,16 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
       setBusiness(biz);
 
       if (biz?.id) {
-        const [statsRes, leadsRes] = await Promise.all([
+        const [statsRes, leadsRes, walletRes, areasRes] = await Promise.all([
           businessApi.getDashboard(),
-          leadsApi.getBusinessLeads(biz.id),
+          leadsApi.feed(),
+          creditsApi.wallet(),
+          businessApi.getServiceAreas(biz.id),
         ]);
         setStats(statsRes.data);
         setLeads(leadsRes.data ?? []);
+        setBalance(walletRes.data?.balance ?? 0);
+        setSetupMissing((biz.subCategories ?? []).length === 0 || (areasRes.data ?? []).length === 0);
       }
     } catch (err) {
       console.error(err);
@@ -65,12 +73,16 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
     return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
 
+  if (showSettings && business) {
+    return <LeadSettingsScreen business={business} onDone={() => { setShowSettings(false); load(); }} />;
+  }
+
   // Show lead detail screen
   if (selectedLeadId) {
     return (
       <LeadDetailScreen
         leadId={selectedLeadId}
-        onBack={() => setSelectedLeadId(null)}
+        onBack={() => { setSelectedLeadId(null); load(); }}
         onQuoteSent={() => {
           setSelectedLeadId(null);
           load();
@@ -93,10 +105,10 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
   );
 
   const metrics = [
+    { label: 'Credits', value: balance ?? '–' },
     { label: 'Total leads', value: stats?.leadCount ?? leads.length },
     { label: 'Profile views', value: stats?.viewCount ?? 0 },
     { label: 'Rating', value: business.ratingAvg?.toFixed(1) ?? '0.0' },
-    { label: 'Reviews', value: business.reviewCount ?? 0 },
   ];
 
   const filters = ['ALL', 'NEW', 'VIEWED', 'QUOTED', 'ACCEPTED', 'COMPLETED'];
@@ -115,6 +127,9 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
               <Text style={s.notifText}>{newLeadsCount}</Text>
             </View>
           )}
+          <TouchableOpacity onPress={() => setShowSettings(true)} style={s.logoutBtn}>
+            <FontAwesome name="sliders" size={14} color="rgba(255,255,255,0.8)" />
+          </TouchableOpacity>
           <TouchableOpacity onPress={onLogout} style={s.logoutBtn}>
             <FontAwesome name="sign-out" size={14} color="rgba(255,255,255,0.8)" />
           </TouchableOpacity>
@@ -133,6 +148,17 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
             </View>
           ))}
         </View>
+
+        {setupMissing && (
+          <TouchableOpacity style={s.setupBanner} onPress={() => setShowSettings(true)}>
+            <FontAwesome name="exclamation-circle" size={15} color="#B45309" style={{ marginRight: 8 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.setupTitle}>You're not receiving leads yet</Text>
+              <Text style={s.setupText}>Choose your service types and the towns you serve.</Text>
+            </View>
+            <FontAwesome name="chevron-right" size={12} color="#B45309" />
+          </TouchableOpacity>
+        )}
 
         {!business.isVerified && (
           <View style={s.verifyBanner}>
@@ -170,26 +196,29 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
             </Text>
             <Text style={s.emptyText}>
               {activeFilter === 'ALL'
-                ? 'Boost your listing to start receiving quote requests.'
+                ? (setupMissing ? 'Set up your service types and towns to start receiving leads.' : 'New requests in your towns will appear here.')
                 : 'Try a different filter.'}
             </Text>
           </View>
         ) : (
           filteredLeads.map(lead => {
             const color = statusColors[lead.status] ?? { bg: '#F3F4F6', text: '#374151' };
+            const req = lead.serviceRequest;
+            const locked = !lead.isUnlocked;
+            const title = req
+              ? `${req.subCategory?.name ?? req.category?.name} · ${[req.suburb?.name, req.town?.name].filter(Boolean).join(', ')}`
+              : lead.customer?.name ?? 'Direct quote request';
             return (
               <TouchableOpacity
                 key={lead.id}
                 style={s.leadCard}
                 onPress={() => setSelectedLeadId(lead.id)}>
                 <View style={s.leadTop}>
-                  <View style={s.leadAvatar}>
-                    <FontAwesome name="user" size={16} color="#fff" />
+                  <View style={[s.leadAvatar, locked && { backgroundColor: '#F59E0B' }]}>
+                    <FontAwesome name={locked ? 'lock' : 'user'} size={16} color="#fff" />
                   </View>
                   <View style={s.leadMeta}>
-                    <Text style={s.leadName} numberOfLines={1}>
-                      {lead.business?.name ?? 'Customer'}
-                    </Text>
+                    <Text style={s.leadName} numberOfLines={1}>{title}</Text>
                     <Text style={s.leadDate}>{formatDate(lead.createdAt)}</Text>
                   </View>
                   <View style={[s.statusBadge, { backgroundColor: color.bg }]}>
@@ -205,6 +234,11 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
                 )}
                 {lead.budget && (
                   <Text style={s.leadBudget}>Budget: R{(lead.budget / 100).toLocaleString()}</Text>
+                )}
+                {locked && (
+                  <Text style={s.unlockHint}>
+                    Unlock for {lead.creditCost} credits · {lead.unlocksRemaining} of 3 spots left
+                  </Text>
                 )}
                 {lead.quotes?.length > 0 && (
                   <View style={s.quotedRow}>
@@ -269,4 +303,8 @@ const s = StyleSheet.create({
   leadBudget: { fontSize: 11, fontWeight: '600', color: '#1A56F0', marginBottom: 4 },
   quotedRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ECFDF5', borderRadius: 8, padding: 8, marginTop: 4 },
   quotedText: { fontSize: 11, fontWeight: '600', color: '#065F46' },
+  unlockHint: { fontSize: 11, fontWeight: '700', color: '#B45309', marginTop: 2 },
+  setupBanner: { marginHorizontal: 14, marginBottom: 12, backgroundColor: '#FFFBEB', borderRadius: 12, padding: 14, borderWidth: 0.5, borderColor: '#FCD34D', flexDirection: 'row', alignItems: 'center' },
+  setupTitle: { fontSize: 13, fontWeight: '700', color: '#B45309', marginBottom: 2 },
+  setupText: { fontSize: 12, color: '#B45309', lineHeight: 18 },
 });

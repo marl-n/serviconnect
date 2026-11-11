@@ -45,6 +45,17 @@ export interface CategoryQuestion {
   updatedAt?: string;
 }
 
+export interface Province { id: string; name: string }
+export interface Town { id: string; name: string; provinceId: string }
+export interface Suburb { id: string; name: string; townId: string }
+
+/** A job location: town is required, suburb optional and descriptive only. */
+export interface JobLocation {
+  province: Province;
+  town: Town;
+  suburb?: Suburb;
+}
+
 export interface ServiceRequestLead {
   id: string;
   businessId: string;
@@ -62,6 +73,11 @@ export interface ServiceRequest {
   jobDate?: string;
   budget?: number;
   answers?: Record<string, unknown>;
+  photos?: string[];
+  townId?: string;
+  suburbId?: string;
+  town?: { id: string; name: string; province: Province };
+  suburb?: { id: string; name: string };
   status: ServiceRequestStatus;
   expiresAt?: string;
   createdAt: string;
@@ -96,6 +112,8 @@ export interface Lead {
   business: Pick<Business, 'id' | 'name' | 'slug' | 'logoUrl'>;
   quotes: Quote[];
   createdAt: string;
+  serviceRequestId?: string | null;
+  isUnlocked?: boolean;
 }
 
 export interface Quote {

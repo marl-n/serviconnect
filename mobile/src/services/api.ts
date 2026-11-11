@@ -30,6 +30,12 @@ function resolveApiBaseUrl(): string {
 
 export const API_BASE_URL = resolveApiBaseUrl();
 
+/** Server origin (no /api/v1) — uploaded files are served from <origin>/uploads/. */
+export const SERVER_ORIGIN = API_BASE_URL.slice(0, -API_PATH.length);
+
+/** Turns a stored upload path ("/uploads/x.jpg") into a loadable URL. */
+export const fileUrl = (path: string) => (/^https?:\/\//i.test(path) ? path : `${SERVER_ORIGIN}${path}`);
+
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
@@ -63,6 +69,15 @@ export const businessApi = {
   update: (id: string, data: any) => api.patch(`/businesses/${id}`, data),
   getSubCategories: (categoryId: string) =>
     api.get(`/businesses/category/${categoryId}/subcategories`),
+  setSubCategories: (bizId: string, subCategoryIds: string[]) =>
+    api.post(`/businesses/${bizId}/subcategories`, { subCategoryIds }),
+  getServiceAreas: (bizId: string) => api.get(`/businesses/${bizId}/service-areas`),
+  setServiceAreas: (bizId: string, townIds: string[]) =>
+    api.post(`/businesses/${bizId}/service-areas`, { townIds }),
+};
+
+export const creditsApi = {
+  wallet: () => api.get('/credits/wallet'),
 };
 
 export const categoryQuestionsApi = {
@@ -79,13 +94,38 @@ export const serviceRequestsApi = {
     jobDate?: string;
     budget?: number;
     answers?: Record<string, unknown>;
+    townId: string;
+    suburbId?: string;
+    photos?: string[];
   }) => api.post('/service-requests', data),
   getMine: () => api.get('/service-requests/my'),
   getById: (id: string) => api.get(`/service-requests/${id}`),
 };
 
+export const locationsApi = {
+  provinces: () => api.get('/locations/provinces'),
+  towns: (provinceId: string, q?: string) => api.get('/locations/towns', { params: { provinceId, q: q || undefined } }),
+  suburbs: (townId: string) => api.get('/locations/suburbs', { params: { townId } }),
+};
+
+export const uploadsApi = {
+  /** Uploads one local image (an ImagePicker uri) and returns its stored path, e.g. "/uploads/123.jpg". */
+  image: async (uri: string, mimeType?: string): Promise<string> => {
+    const type = mimeType || (/\.png$/i.test(uri) ? 'image/png' : 'image/jpeg');
+    const form = new FormData();
+    form.append('file', { uri, name: `photo.${type.split('/')[1]}`, type } as any);
+    const res = await api.post('/uploads/images', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000,
+    });
+    return res.data.url;
+  },
+};
+
 export const leadsApi = {
   createLead: (data: any) => api.post('/leads', data),
+  feed: (status?: string) => api.get('/leads/feed', { params: { status } }),
+  unlock: (leadId: string) => api.post(`/leads/${leadId}/unlock`),
   getMyLeads: () => api.get('/leads/my'),
   getLeadById: (id: string) => api.get(`/leads/${id}`),
   getBusinessLeads: (bizId: string, status?: string) =>

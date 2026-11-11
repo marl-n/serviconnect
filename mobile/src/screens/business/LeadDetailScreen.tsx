@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, TextInput, Alert, ActivityIndicator, Linking
+  ScrollView, TextInput, Alert, ActivityIndicator, Linking, Image
 } from 'react-native';
 import { FontAwesome } from '@expo/vector-icons';
-import { leadsApi } from '../../services/api';
+import { leadsApi, creditsApi, categoryQuestionsApi, fileUrl } from '../../services/api';
+
+/** Renders a stored answer value for display. */
+const showAnswer = (v: unknown) =>
+  Array.isArray(v) ? v.join(', ') : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v ?? '');
+
+const errorText = (err: any, fallback: string) => {
+  const m = err?.response?.data?.message;
+  return Array.isArray(m) ? m.join('\n') : m || fallback;
+};
 
 
 interface Props {
@@ -20,14 +29,50 @@ export default function LeadDetailScreen({ leadId, onBack, onQuoteSent }: Props)
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [unlocking, setUnlocking] = useState(false);
+  const [labels, setLabels] = useState<Record<string, string>>({});
 
   useEffect(() => {
     leadsApi.updateStatus(leadId, 'VIEWED').catch(() => {});
+    creditsApi.wallet().then(r => setBalance(r.data?.balance ?? 0)).catch(() => {});
     leadsApi.getLeadById(leadId)
-      .then(res => setLead(res.data))
+      .then(res => {
+        setLead(res.data);
+        const req = res.data?.serviceRequest;
+        if (req?.answers && Object.keys(req.answers).length > 0) {
+          categoryQuestionsApi.list(req.category.id, req.subCategory.id)
+            .then(q => setLabels(Object.fromEntries((q.data ?? []).map((x: any) => [x.key, x.label]))))
+            .catch(() => {});
+        }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [leadId]);
+
+  const unlock = () => {
+    Alert.alert(
+      'Unlock this lead?',
+      `This uses ${lead.creditCost} credits (you have ${balance ?? 0}). You will get the customer's name, phone number and address.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Unlock', onPress: async () => {
+            setUnlocking(true);
+            try {
+              const res = await leadsApi.unlock(leadId);
+              setLead(res.data.lead);
+              setBalance(res.data.balance);
+            } catch (err: any) {
+              Alert.alert('Could not unlock', errorText(err, 'Please try again.'));
+            } finally {
+              setUnlocking(false);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const sendQuote = async () => {
     if (!amount || !description.trim()) {
@@ -44,8 +89,8 @@ export default function LeadDetailScreen({ leadId, onBack, onQuoteSent }: Props)
         validUntil: validUntil.toISOString(),
       });
       Alert.alert('Quote Sent!', 'The customer has been notified.', [{ text: 'OK', onPress: onQuoteSent }]);
-    } catch {
-      Alert.alert('Error', 'Could not send quote. Please try again.');
+    } catch (err: any) {
+      Alert.alert('Error', errorText(err, 'Could not send quote. Please try again.'));
     } finally {
       setSubmitting(false);
     }
@@ -93,6 +138,9 @@ export default function LeadDetailScreen({ leadId, onBack, onQuoteSent }: Props)
   const color = statusColors[lead.status] ?? { bg: '#F3F4F6', text: '#374151' };
   const hasQuote = lead.quotes?.length > 0;
   const latestQuote = lead.quotes?.[0];
+  const req = lead.serviceRequest;
+  const locked = !lead.isUnlocked;
+  const answers: [string, unknown][] = req?.answers ? Object.entries(req.answers) : [];
 
   return (
     <View style={s.container}>
@@ -109,6 +157,24 @@ export default function LeadDetailScreen({ leadId, onBack, onQuoteSent }: Props)
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={s.card}>
           <Text style={s.cardTitle}>Customer Request</Text>
+          {req && (
+            <>
+              <Text style={s.jobTitle}>{req.subCategory?.name}</Text>
+              <Text style={s.jobSub}>{req.category?.name}</Text>
+              <View style={s.infoRow}>
+                <FontAwesome name="map-marker" size={13} color="#9CA3AF" style={s.infoIcon} />
+                <Text style={s.infoText}>
+                  {[req.suburb?.name, req.town?.name, req.town?.province?.name].filter(Boolean).join(', ')}
+                </Text>
+              </View>
+            </>
+          )}
+          {!locked && lead.customer && (
+            <View style={s.infoRow}>
+              <FontAwesome name="user" size={13} color="#9CA3AF" style={s.infoIcon} />
+              <Text style={s.infoText}>{lead.customer.name} · {lead.customer.phone}</Text>
+            </View>
+          )}
           <View style={s.infoRow}>
             <FontAwesome name="calendar" size={13} color="#9CA3AF" style={s.infoIcon} />
             <Text style={s.infoText}>{formatDate(lead.createdAt)}</Text>
@@ -125,11 +191,37 @@ export default function LeadDetailScreen({ leadId, onBack, onQuoteSent }: Props)
               <Text style={s.infoText}>Budget: R{(lead.budget / 100).toLocaleString()}</Text>
             </View>
           )}
-                   <View style={s.messageBubble}>
+          <View style={s.messageBubble}>
             <Text style={s.messageText}>{lead.message}</Text>
           </View>
 
-          {/* Contact actions */}
+          {answers.length > 0 && (
+            <View style={{ marginTop: 12 }}>
+              {answers.map(([k, v]) => (
+                <View key={k} style={s.answerRow}>
+                  <Text style={s.answerLabel}>{labels[k] ?? k}</Text>
+                  <Text style={s.answerValue}>{showAnswer(v)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {req?.photos?.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+              {req.photos.map((p: string) => (
+                <TouchableOpacity key={p} onPress={() => Linking.openURL(fileUrl(p))}>
+                  <Image source={{ uri: fileUrl(p) }} style={s.photo} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+
+          {locked ? (
+            <View style={s.lockBox}>
+              <FontAwesome name="lock" size={14} color="#B45309" style={{ marginRight: 8 }} />
+              <Text style={s.lockText}>The customer's name, phone number and address are shown after you unlock this lead.</Text>
+            </View>
+          ) : (
           <View style={s.contactRow}>
             <TouchableOpacity
               style={s.contactBtn}
@@ -161,6 +253,7 @@ export default function LeadDetailScreen({ leadId, onBack, onQuoteSent }: Props)
               <Text style={[s.contactBtnText, { color: '#1A56F0' }]}>SMS</Text>
             </TouchableOpacity>
           </View>
+          )}
 
         </View>
 
@@ -186,7 +279,34 @@ export default function LeadDetailScreen({ leadId, onBack, onQuoteSent }: Props)
           </View>
         )}
 
-        {!hasQuote && lead.status !== 'REJECTED' && (
+        {locked && (
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Unlock lead</Text>
+            {lead.canUnlock ? (
+              <>
+                <Text style={s.unlockInfo}>
+                  {lead.creditCost} credits · {lead.unlocksRemaining} of 3 spots left · your balance: {balance ?? '–'}
+                </Text>
+                <TouchableOpacity
+                  style={[s.sendQuoteBtn, (unlocking || (balance ?? 0) < lead.creditCost) && s.submitDisabled]}
+                  onPress={unlock}
+                  disabled={unlocking || (balance ?? 0) < lead.creditCost}>
+                  {unlocking ? <ActivityIndicator color="#fff" /> : (
+                    <>
+                      <FontAwesome name="unlock" size={14} color="#fff" style={{ marginRight: 8 }} />
+                      <Text style={s.sendQuoteBtnText}>Unlock for {lead.creditCost} credits</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+                {(balance ?? 0) < lead.creditCost && <Text style={s.unlockWarn}>Not enough credits.</Text>}
+              </>
+            ) : (
+              <Text style={s.unlockInfo}>This lead is no longer available.</Text>
+            )}
+          </View>
+        )}
+
+        {!locked && !hasQuote && !['REJECTED', 'ACCEPTED', 'COMPLETED'].includes(lead.status) && (
           <View style={s.card}>
             <Text style={s.cardTitle}>Send a Quote</Text>
             {!showQuoteForm ? (
@@ -287,4 +407,14 @@ contactBtn: { flex: 1, backgroundColor: '#1A56F0', borderRadius: 10, paddingVert
 whatsappBtn: { backgroundColor: '#25D366' },
 messageBtn: { backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: '#E5E7EB' },
 contactBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  jobTitle: { fontSize: 17, fontWeight: '700', color: '#111827' },
+  jobSub: { fontSize: 12, color: '#6B7280', marginBottom: 10 },
+  answerRow: { paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: '#F3F4F6' },
+  answerLabel: { fontSize: 11, color: '#6B7280', marginBottom: 2 },
+  answerValue: { fontSize: 13, color: '#111827', fontWeight: '600' },
+  photo: { width: 96, height: 96, borderRadius: 10, marginRight: 8, backgroundColor: '#E5E7EB' },
+  lockBox: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#FFFBEB', borderRadius: 10, padding: 12, marginTop: 14 },
+  lockText: { flex: 1, fontSize: 12, color: '#B45309', lineHeight: 18 },
+  unlockInfo: { fontSize: 13, color: '#374151', marginBottom: 12 },
+  unlockWarn: { fontSize: 12, color: '#DC2626', marginTop: 8, textAlign: 'center' },
 });
