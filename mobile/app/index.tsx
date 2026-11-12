@@ -12,8 +12,9 @@ import LeadSettingsScreen from '../src/screens/business/LeadSettingsScreen';
 import MyQuotesScreen from '../src/screens/customer/MyQuotesScreen';
 import SavedScreen from '../src/screens/customer/SavedScreen';
 import NewServiceRequestScreen from '../src/screens/customer/NewServiceRequestScreen';
+import NotificationsScreen, { UnreadBadge, useUnreadCount } from '../src/screens/NotificationsScreen';
 
-type Tab = 'search' | 'request' | 'profile' | 'quotes' | 'saved';
+type Tab = 'search' | 'request' | 'profile' | 'quotes' | 'saved' | 'alerts';
 
 interface AppState {
   user: any;
@@ -99,12 +100,22 @@ export default function Index() {
     />
   );
 
-  // Customer tab layout
+  return <CustomerTabs user={user} activeTab={activeTab} setActiveTab={setActiveTab} logout={logout} />;
+}
+
+/** Customer tab layout. Separate so unread-count polling only runs for signed-in customers. */
+function CustomerTabs({ user, activeTab, setActiveTab, logout }: {
+  user: any; activeTab: Tab; setActiveTab: (t: Tab) => void; logout: () => void;
+}) {
+  const { unread, refresh } = useUnreadCount();
+  useEffect(() => { refresh(); }, [activeTab]);
+
   const tabs: { key: Tab; label: string; icon: string }[] = [
     { key: 'search', label: 'Search', icon: 'search' },
     { key: 'request', label: 'Request', icon: 'plus-circle' },
     { key: 'quotes', label: 'My Quotes', icon: 'file-text-o' },
     { key: 'saved', label: 'Saved', icon: 'heart' },
+    { key: 'alerts', label: 'Alerts', icon: 'bell' },
     { key: 'profile', label: 'Account', icon: 'user' },
   ];
 
@@ -121,6 +132,7 @@ export default function Index() {
         {activeTab === 'profile' && <ProfileScreen user={user} onLogout={logout} />}
         {activeTab === 'quotes' && <MyQuotesScreen onViewBusiness={(slug) => {}} />}
         {activeTab === 'saved' && <SavedScreen />}
+        {activeTab === 'alerts' && <NotificationsScreen onOpen={() => { refresh(); setActiveTab('quotes'); }} />}
       </View>
 
       <View style={s.tabBar}>
@@ -129,11 +141,14 @@ export default function Index() {
             key={tab.key}
             style={s.tabItem}
             onPress={() => setActiveTab(tab.key)}>
-            <FontAwesome
-              name={tab.icon as any}
-              size={20}
-              color={activeTab === tab.key ? '#1A56F0' : '#9CA3AF'}
-            />
+            <View>
+              <FontAwesome
+                name={tab.icon as any}
+                size={20}
+                color={activeTab === tab.key ? '#1A56F0' : '#9CA3AF'}
+              />
+              {tab.key === 'alerts' && <UnreadBadge count={unread} />}
+            </View>
             <Text style={[s.tabLabel, activeTab === tab.key && s.tabLabelActive]}>
               {tab.label}
             </Text>

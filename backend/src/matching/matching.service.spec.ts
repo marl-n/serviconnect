@@ -38,11 +38,15 @@ function fakePrisma() {
             if (skipDuplicates) continue;
             throw new Error('Unique constraint failed');
           }
-          leads.push(d);
+          leads.push({ ...d, id: `lead-${leads.length + 1}` });
           count++;
         }
         return { count };
       },
+      findMany: async ({ where }: any) =>
+        leads
+          .filter(l => l.serviceRequestId === where.serviceRequestId && where.businessId.in.includes(l.businessId))
+          .map(l => ({ ...l, business: { userId: businesses.find(b => b.id === l.businessId)?.userId } })),
     },
   };
 }
@@ -108,5 +112,22 @@ describe('MatchingService', () => {
     db.requests.push(request({ id: 'sr-new' }), request({ id: 'sr-old', createdAt: new Date(Date.now() - 30 * 86_400_000) }));
     expect(await new MatchingService(db as any).matchBusiness('late')).toBe(1);
     expect(db.leads.map(l => l.serviceRequestId)).toEqual(['sr-new']);
+  });
+
+  it('notifies each business owner once per new lead, never on a re-run', async () => {
+    const db = fakePrisma();
+    db.businesses.push(biz('a'), biz('b'));
+    db.requests.push(request());
+    const sent: any[] = [];
+    const notifications = { send: async (items: any[]) => { sent.push(...items); } };
+    const svc = new MatchingService(db as any, notifications as any);
+
+    await svc.matchRequest('sr-1');
+    expect(sent.map(n => n.userId).sort()).toEqual(['user-a', 'user-b']);
+    expect(sent.every(n => n.type === 'NEW_LEAD' && n.data.serviceRequestId === 'sr-1')).toBe(true);
+
+    db.businesses.push(biz('c'));
+    await svc.matchRequest('sr-1');
+    expect(sent.map(n => n.userId).sort()).toEqual(['user-a', 'user-b', 'user-c']);
   });
 });

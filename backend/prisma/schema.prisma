@@ -106,6 +106,7 @@ model User {
   sentMessages    Message[]       @relation("SentMessages")
   otps            OtpCode[]
   serviceRequests ServiceRequest[]
+  notifications   Notification[]
 
   @@index([phone])
   @@index([role])
@@ -653,4 +654,21 @@ model CreditPurchase {
   transactions CreditTransaction[]
 
   @@index([businessId])
+}
+
+/// In-app notification for one user (new lead, business interested, new quote, quote accepted/declined).
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
 }

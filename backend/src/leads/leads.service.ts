@@ -1,8 +1,11 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Optional } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import { CreditsService, MAX_UNLOCKS_PER_REQUEST } from '../credits/credits.service';
 import { SendQuoteDto } from './leads.dto';
+import { NotificationsService } from '../notifications/notifications.service';
+
+const rand = (cents: number) => `R${(cents / 100).toLocaleString('en-ZA', { maximumFractionDigits: 2 })}`;
 
 /** Request details a business sees on a marketplace lead. */
 const REQUEST_FOR_BUSINESS = {
@@ -25,7 +28,11 @@ const BUSINESS_FOR_CUSTOMER = {
 
 @Injectable()
 export class LeadsService {
-  constructor(private prisma: PrismaService, private credits: CreditsService) {}
+  constructor(
+    private prisma: PrismaService,
+    private credits: CreditsService,
+    @Optional() private notifications?: NotificationsService,
+  ) {}
 
   // ─── Legacy direct quote request (customer → one business) ─────────────────
 
@@ -105,6 +112,7 @@ export class LeadsService {
   async unlock(leadId: string, userId: string) {
     const business = await this.ownBusiness(userId);
     const result = await this.credits.unlockLead({ leadId, businessId: business.id });
+    if (!result.alreadyUnlocked) await this.notifyUnlocked(leadId, business.name);
     const balance = await this.credits.getBalance(business.id);
     return { ...result, balance: balance.balance, lead: await this.getLeadById(leadId, userId) };
   }
@@ -139,6 +147,13 @@ export class LeadsService {
       where: { id: leadId },
       data: { status: 'QUOTED', respondedAt: new Date() },
     });
+    await this.notifications?.send([{
+      userId: lead.customerId,
+      type: 'NEW_QUOTE',
+      title: `New quote from ${business.name}`,
+      body: `${rand(dto.amount)} — tap to compare your quotes`,
+      data: { leadId, quoteId: quote.id, serviceRequestId: lead.serviceRequestId },
+    }]);
     return quote;
   }
 
@@ -186,10 +201,12 @@ export class LeadsService {
     if (quote.validUntil < new Date()) throw new BadRequestException('This quote has expired');
 
     const requestId = quote.lead.serviceRequestId;
-    return this.prisma.$transaction(async tx => {
+    let declined: { id: string; businessId: string }[] = [];
+    const accepted = await this.prisma.$transaction(async tx => {
       if (requestId) {
-        const otherLeads = await tx.lead.findMany({ where: { serviceRequestId: requestId, id: { not: quote.leadId } }, select: { id: true } });
+        const otherLeads = await tx.lead.findMany({ where: { serviceRequestId: requestId, id: { not: quote.leadId } }, select: { id: true, businessId: true, status: true } });
         const otherIds = otherLeads.map(l => l.id);
+        declined = otherLeads.filter(l => l.status === 'QUOTED');
         await tx.quote.updateMany({ where: { leadId: { in: otherIds }, status: 'PENDING' }, data: { status: 'REJECTED' } });
         await tx.lead.updateMany({ where: { id: { in: otherIds }, status: 'QUOTED' }, data: { status: 'REJECTED' } });
         await tx.serviceRequest.update({ where: { id: requestId }, data: { status: 'FULFILLED' } });
@@ -197,6 +214,45 @@ export class LeadsService {
       await tx.lead.update({ where: { id: quote.leadId }, data: { status: 'ACCEPTED' } });
       return tx.quote.update({ where: { id: quoteId }, data: { status: 'ACCEPTED', acceptedAt: new Date() } });
     });
+    await this.notifyDecision(quote.leadId, quote.amount, declined);
+    return accepted;
+  }
+
+  private async notifyUnlocked(leadId: string, businessName: string) {
+    if (!this.notifications) return;
+    const lead = await this.prisma.lead.findUnique({
+      where: { id: leadId },
+      select: { customerId: true, serviceRequestId: true, serviceRequest: { select: { subCategory: { select: { name: true } } } } },
+    });
+    if (!lead) return;
+    await this.notifications.send([{
+      userId: lead.customerId,
+      type: 'LEAD_UNLOCKED',
+      title: `${businessName} is interested`,
+      body: `They can now contact you about your ${lead.serviceRequest?.subCategory?.name ?? 'request'} request.`,
+      data: { leadId, serviceRequestId: lead.serviceRequestId },
+    }]);
+  }
+
+  /** Tells the hired business, and every business whose quote was declined as a result. */
+  private async notifyDecision(acceptedLeadId: string, amount: number, declined: { id: string; businessId: string }[]) {
+    if (!this.notifications) return;
+    const owners = await this.prisma.business.findMany({
+      where: { OR: [{ leads: { some: { id: acceptedLeadId } } }, { id: { in: declined.map(d => d.businessId) } }] },
+      select: { id: true, userId: true, leads: { where: { id: acceptedLeadId }, select: { id: true } } },
+    });
+    const ownerOf = new Map(owners.map(o => [o.id, o.userId]));
+    const winner = owners.find(o => o.leads.length > 0);
+    await this.notifications.send([
+      ...(winner ? [{
+        userId: winner.userId, type: 'QUOTE_ACCEPTED' as const, title: 'Your quote was accepted',
+        body: `The customer hired you for ${rand(amount)}. Contact them to arrange the job.`, data: { leadId: acceptedLeadId },
+      }] : []),
+      ...declined.filter(d => ownerOf.has(d.businessId)).map(d => ({
+        userId: ownerOf.get(d.businessId)!, type: 'QUOTE_DECLINED' as const, title: 'Quote not selected',
+        body: 'The customer hired another business for this job.', data: { leadId: d.id },
+      })),
+    ]);
   }
 
   // ─── Shared ─────────────────────────────────────────────────────────────────

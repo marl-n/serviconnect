@@ -7,6 +7,7 @@ import { FontAwesome } from '@expo/vector-icons';
 import { businessApi, leadsApi, creditsApi } from '../../services/api';
 import LeadDetailScreen from './LeadDetailScreen';
 import LeadSettingsScreen from './LeadSettingsScreen';
+import NotificationsScreen, { UnreadBadge, useUnreadCount } from '../NotificationsScreen';
 
 interface Props {
   onViewLead: (leadId: string) => void;
@@ -33,6 +34,8 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
   const [balance, setBalance] = useState<number | null>(null);
   const [setupMissing, setSetupMissing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const { unread, refresh: refreshUnread } = useUnreadCount();
 
   const load = useCallback(async () => {
     try {
@@ -62,7 +65,7 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
 
   useEffect(() => { load(); }, []);
 
-  const onRefresh = () => { setRefreshing(true); load(); };
+  const onRefresh = () => { setRefreshing(true); load(); refreshUnread(); };
 
   const filteredLeads = activeFilter === 'ALL'
     ? leads
@@ -72,6 +75,19 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
     const d = new Date(dateStr);
     return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   };
+
+  if (showNotifications) {
+    return (
+      <NotificationsScreen
+        onBack={() => { setShowNotifications(false); refreshUnread(); load(); }}
+        onOpen={n => {
+          setShowNotifications(false);
+          refreshUnread();
+          if (n.data?.leadId) setSelectedLeadId(n.data.leadId);
+        }}
+      />
+    );
+  }
 
   if (showSettings && business) {
     return <LeadSettingsScreen business={business} onDone={() => { setShowSettings(false); load(); }} />;
@@ -127,6 +143,10 @@ export default function DashboardScreen({ onViewLead, onLogout }: Props) {
               <Text style={s.notifText}>{newLeadsCount}</Text>
             </View>
           )}
+          <TouchableOpacity onPress={() => setShowNotifications(true)} style={s.logoutBtn}>
+            <FontAwesome name="bell" size={14} color="rgba(255,255,255,0.8)" />
+            <UnreadBadge count={unread} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={() => setShowSettings(true)} style={s.logoutBtn}>
             <FontAwesome name="sliders" size={14} color="rgba(255,255,255,0.8)" />
           </TouchableOpacity>

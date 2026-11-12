@@ -39,7 +39,8 @@ None of the packages has a linter configured, and only the backend has tests.
 - **Auth:** OTP phone login (`/auth/otp/send` → `/auth/otp/verify` → JWT). With `NODE_ENV=development`, OTP codes go to the server console instead of Twilio. No guard is registered globally. Each protected route opts in with `@UseGuards(JwtAuthGuard, RolesGuard)` plus `@Roles(...)`, and reads the user via `@CurrentUser()` from `src/common/decorators`. The roles are `UserRole` in the Prisma schema (CUSTOMER / BUSINESS / ADMIN).
 - **Data access:** every module goes through `PrismaService` from `src/common/prisma`. The full domain model lives in `prisma/schema.prisma`, and changes to it need a new migration (`npx prisma migrate dev --name <name>`).
 - **Uploads:** `POST /uploads/images` stores images on local disk in `backend/uploads/` (gitignored), served at `/uploads/<file>` outside the `api/v1` prefix. This is MVP storage; move to S3 before running more than one instance.
-- **Stub modules:** `AdminModule` is an empty placeholder. Stripe subscriptions, messaging, ads and notifications are planned (see `DEVELOPER_GUIDE.md`) but have not been built.
+- **Notifications** (`notifications/`): in-app only. `NotificationsService.send` never throws, so a failed notification can't fail the action that triggered it. Matching sends NEW_LEAD (only for newly created leads). Unlocking sends LEAD_UNLOCKED, quoting sends NEW_QUOTE, and accepting sends QUOTE_ACCEPTED and QUOTE_DECLINED. The mobile app polls `/notifications/unread-count` every 30 s. There is no phone push yet.
+- **Stub modules:** `AdminModule` is an empty placeholder. Stripe subscriptions, messaging and ads are planned (see `DEVELOPER_GUIDE.md`) but have not been built.
 
 ### Two lead flows (important)
 

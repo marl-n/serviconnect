@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /** Credits a business pays to unlock one marketplace lead (env LEAD_UNLOCK_CREDITS). */
 export const leadUnlockCredits = () => {
@@ -24,7 +25,7 @@ const ELIGIBLE_BUSINESS_STATUSES = ['ACTIVE', 'PENDING', 'UNVERIFIED'] as const;
 @Injectable()
 export class MatchingService {
   private readonly log = new Logger(MatchingService.name);
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, @Optional() private notifications?: NotificationsService) {}
 
   /** Run after a request is created. Returns the number of new leads. */
   async matchRequest(serviceRequestId: string): Promise<number> {
@@ -75,6 +76,11 @@ export class MatchingService {
   private async createLeads(req: any, businessIds: string[]): Promise<number> {
     if (businessIds.length === 0) return 0;
     const expiresAt = new Date(new Date(req.createdAt).getTime() + LEAD_TTL_DAYS * 86_400_000);
+    const existing = await this.prisma.lead.findMany({
+      where: { serviceRequestId: req.id, businessId: { in: businessIds } },
+      select: { businessId: true },
+    });
+    const had = new Set(existing.map(l => l.businessId));
     const { count } = await this.prisma.lead.createMany({
       data: businessIds.map(businessId => ({
         customerId: req.customerId,
@@ -96,7 +102,35 @@ export class MatchingService {
       }
       await this.prisma.business.updateMany({ where: { id: { in: businessIds } }, data: { leadCount: { increment: 1 } } });
       this.log.log(`Request ${req.id}: ${count} new lead(s)`);
+      await this.notifyNewLeads(req, businessIds.filter(id => !had.has(id)));
     }
     return count;
+  }
+
+  /** Tells each business owner about a lead created by this run (not ones that already existed). */
+  private async notifyNewLeads(req: any, businessIds: string[]) {
+    if (!this.notifications || businessIds.length === 0) return;
+    try {
+      const [leads, info] = await Promise.all([
+        this.prisma.lead.findMany({
+          where: { serviceRequestId: req.id, businessId: { in: businessIds } },
+          select: { id: true, business: { select: { userId: true } } },
+        }),
+        this.prisma.serviceRequest.findUnique({
+          where: { id: req.id },
+          select: { subCategory: { select: { name: true } }, town: { select: { name: true } }, suburb: { select: { name: true } } },
+        }),
+      ]);
+      const where = [info?.suburb?.name, info?.town?.name].filter(Boolean).join(', ');
+      await this.notifications.send(leads.map(l => ({
+        userId: l.business.userId,
+        type: 'NEW_LEAD' as const,
+        title: 'New lead',
+        body: `${info?.subCategory?.name ?? 'A new job'}${where ? ` in ${where}` : ''}`,
+        data: { leadId: l.id, serviceRequestId: req.id },
+      })));
+    } catch (err) {
+      this.log.error(`Could not notify new leads for ${req.id}: ${(err as Error).message}`);
+    }
   }
 }

@@ -147,6 +147,13 @@ export const reviewsApi = {
     api.patch(`/reviews/${reviewId}/reply`, { reply }),
 };
 
+export const notificationsApi = {
+  list: () => api.get('/notifications'),
+  unreadCount: () => api.get('/notifications/unread-count'),
+  markRead: (id: string) => api.post(`/notifications/${id}/read`),
+  markAllRead: () => api.post('/notifications/read'),
+};
+
 export const savedApi = {
   getMySaved: () => api.get('/saved'),
   isSaved: (businessId: string) => api.get(`/saved/${businessId}/check`),
