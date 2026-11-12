@@ -1,0 +1,4 @@
+## Mobile architecture
+
+- Despite `expo-router` being the entry point, there is only one route, `app/index.tsx`. It loads the token from AsyncStorage (`sc_token`) and calls `/auth/me`, then switches between login, business onboarding/dashboard (for the BUSINESS role) and the customer tabs, which are driven by local `activeTab` state. Screens live in `src/screens/{auth,customer,business}`.
+- All API calls go through `src/services/api.ts` (axios plus a bearer-token interceptor). The base URL comes from `EXPO_PUBLIC_API_URL` in `mobile/.env`, which must be set or the app throws at startup. It can be written with or without `/api/v1`, since the client appends the path only when it's missing. Expo inlines the value at bundle time, so restart with `npx expo start --clear` after changing it. EAS builds need the variable set in the EAS environment because `.env` is gitignored.
